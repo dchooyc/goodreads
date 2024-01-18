@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"goodreads/book"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -17,39 +19,57 @@ func main() {
 	rootUrl := flag.String("url", "https://www.goodreads.com", "The url to begin crawling from")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	flag.Parse()
+
+	file, err := os.Create("output.json")
+	if err != nil {
+		panic(err)
+	}
+
 	books := bfs(*rootUrl, *maxDepth)
-	for _, b := range books {
-		fmt.Println(*b)
+
+	jsonData, err := json.Marshal(books)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = file.Write(jsonData)
+	if err != nil {
+		fmt.Println("writing to file: ", err)
 	}
 }
 
-func bfs(urlStr string, maxDepth int) []*book.Book {
+func bfs(urlStr string, maxDepth int) book.Books {
 	urlToBook := make(map[string]*book.Book)
 	q := []string{urlStr}
 
 	for i := 0; i < maxDepth; i++ {
+		fmt.Println("depth: " + strconv.Itoa(i))
+		fmt.Println("books: " + strconv.Itoa(len(q)))
 		q2 := []string{}
 		for _, url := range q {
 			if _, ok := urlToBook[url]; !ok {
 				b := getBook(url)
+				fmt.Println(b.Title)
 				if b != nil && len(b.ID) != 0 && i < maxDepth-1 {
 					simBooks := similarPrefix + b.ID
 					simBooksURLs := getBookURLs(simBooks)
-					q2 = append(q2, simBooksURLs...)
+					for _, sbu := range simBooksURLs {
+						if _, ok := urlToBook[sbu]; !ok {
+							q2 = append(q2, sbu)
+						}
+					}
 				}
 				urlToBook[url] = b
 			}
 		}
-		fmt.Println("depth: " + strconv.Itoa(i))
-		fmt.Println("books: " + strconv.Itoa(len(q)))
 		q = q2
 	}
-	res, i := make([]*book.Book, len(urlToBook)), 0
+	res, i := make([]book.Book, len(urlToBook)), 0
 	for _, b := range urlToBook {
-		res[i] = b
+		res[i] = *b
 		i++
 	}
-	return res
+	return book.Books{Books: res}
 }
 
 func getBookURLs(urlString string) []string {

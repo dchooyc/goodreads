@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goodreads/book"
 	"net/http"
+	"strconv"
 )
 
 const (
@@ -13,17 +14,42 @@ const (
 )
 
 func main() {
-	rootUrl := flag.String("url", goodreadsPrefix, "The url to begin crawling from")
-	// maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
-	// genre := flag.String("genre", "computer-science", "The genre of books to crawl for")
+	rootUrl := flag.String("url", "https://www.goodreads.com", "The url to begin crawling from")
+	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	flag.Parse()
-	b := getBook(*rootUrl)
-	if b != nil && len(b.ID) != 0 {
-		simBooks := similarPrefix + b.ID
-		simBooksURLs := getBookURLs(simBooks)
-		fmt.Println(simBooksURLs)
+	books := bfs(*rootUrl, *maxDepth)
+	for _, b := range books {
 		fmt.Println(*b)
 	}
+}
+
+func bfs(urlStr string, maxDepth int) []*book.Book {
+	urlToBook := make(map[string]*book.Book)
+	q := []string{urlStr}
+
+	for i := 0; i < maxDepth; i++ {
+		q2 := []string{}
+		for _, url := range q {
+			if _, ok := urlToBook[url]; !ok {
+				b := getBook(url)
+				if b != nil && len(b.ID) != 0 && i < maxDepth-1 {
+					simBooks := similarPrefix + b.ID
+					simBooksURLs := getBookURLs(simBooks)
+					q2 = append(q2, simBooksURLs...)
+				}
+				urlToBook[url] = b
+			}
+		}
+		fmt.Println("depth: " + strconv.Itoa(i))
+		fmt.Println("books: " + strconv.Itoa(len(q)))
+		q = q2
+	}
+	res, i := make([]*book.Book, len(urlToBook)), 0
+	for _, b := range urlToBook {
+		res[i] = b
+		i++
+	}
+	return res
 }
 
 func getBookURLs(urlString string) []string {

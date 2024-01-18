@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	BookURLIndicator     = "/book/show/"
 	BookIDIndicator      = "/work/quotes/"
 	BookCoverIndicator   = "BookCover__image"
 	BookAuthorsIndicator = "ContributorLinksList"
@@ -29,8 +30,34 @@ type Book struct {
 	Reviews  int
 }
 
-// to only run parse on a book url
-func Parse(r io.Reader) (*Book, error) {
+func GetBookURLs(r io.Reader) ([]string, error) {
+	bookURLs := []string{}
+	doc, err := html.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+	ExtractURLs(doc, &bookURLs)
+	return bookURLs, nil
+}
+
+func ExtractURLs(n *html.Node, urls *[]string) {
+	if n.Type == html.ElementNode && n.Data == "a" {
+		for _, attr := range n.Attr {
+			if attr.Key == "href" {
+				url := attr.Val
+				if strings.HasPrefix(url, BookURLIndicator) {
+					*urls = append(*urls, url)
+				}
+				break
+			}
+		}
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		ExtractURLs(c, urls)
+	}
+}
+
+func GetBook(r io.Reader) (*Book, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
 		return nil, err

@@ -30,19 +30,19 @@ type Book struct {
 }
 
 // to only run parse on a book url
-func Parse(r io.Reader) ([]*Book, error) {
+func Parse(r io.Reader) (*Book, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
 		return nil, err
 	}
-	return FindBooks(doc)
+	book := CreateBook(doc)
+	return book, nil
 }
 
-func FindBooks(n *html.Node) ([]*Book, error) {
-	// fmt.Printf("%#v\n", n)
+func CreateBook(n *html.Node) *Book {
 	curBook := &Book{}
 	ExtractBookInfo(n, curBook)
-	return []*Book{curBook}, nil
+	return curBook
 }
 
 func ExtractBookInfo(n *html.Node, curBook *Book) {

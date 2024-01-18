@@ -3,6 +3,7 @@ package book
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -13,6 +14,8 @@ const (
 	BookCoverIndicator   = "BookCover__image"
 	BookAuthorsIndicator = "ContributorLinksList"
 	BookGenresIndicator  = "/genres/"
+	BookRatingIndicator  = "RatingStatistics__rating"
+	BookStatsIndicator   = "RatingStatistics__meta"
 )
 
 type Book struct {
@@ -36,7 +39,7 @@ func Parse(r io.Reader) ([]*Book, error) {
 }
 
 func FindBooks(n *html.Node) ([]*Book, error) {
-	fmt.Printf("%#v\n", n)
+	// fmt.Printf("%#v\n", n)
 	curBook := &Book{}
 	ExtractBookInfo(n, curBook)
 	return []*Book{curBook}, nil
@@ -49,6 +52,8 @@ func ExtractBookInfo(n *html.Node, curBook *Book) {
 	}
 	if n.Type == html.ElementNode && n.Data == "div" {
 		ExtractCover(n, curBook)
+		ExtractRating(n, curBook)
+		ExtractStats(n, curBook)
 		ExtractAuthors(n, curBook)
 	}
 	if n.Type == html.ElementNode && n.Data == "h1" {
@@ -56,6 +61,53 @@ func ExtractBookInfo(n *html.Node, curBook *Book) {
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ExtractBookInfo(c, curBook)
+	}
+}
+
+func ExtractRating(n *html.Node, curBook *Book) {
+	for _, attr := range n.Attr {
+		if attr.Key == "class" && attr.Val == BookRatingIndicator {
+			textNode := n.FirstChild
+			if textNode != nil {
+				val, err := strconv.ParseFloat(textNode.Data, 64)
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
+				curBook.Rating = val
+			}
+		}
+	}
+}
+
+func ExtractStats(n *html.Node, curBook *Book) {
+	correctClass, val := false, ""
+	for _, attr := range n.Attr {
+		if attr.Key == "class" && attr.Val == BookStatsIndicator {
+			correctClass = true
+		}
+		if attr.Key == "aria-label" {
+			val = attr.Val
+		}
+	}
+	if correctClass {
+		parts := strings.Split(val, " ")
+		ratings := parts[0]
+		reviews := parts[3]
+		ratings = strings.Join(strings.Split(ratings, ","), "")
+		reviews = strings.Join(strings.Split(reviews, ","), "")
+		ratingsVal, err := strconv.Atoi(ratings)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		curBook.Ratings = ratingsVal
+		reviewsVal, err := strconv.Atoi(reviews)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		curBook.Reviews = reviewsVal
 	}
 }
 

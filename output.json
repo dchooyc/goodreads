@@ -1,167 +1,8 @@
 {
     "books": [
         {
-            "title": "Book title: Clean Code: A Handbook of Agile Software Craftsmanship",
-            "id": "3779106",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1436202607i/3735293.jpg",
-            "authors": [
-                "Robert C. Martin"
-            ],
-            "genres": [
-                "programming",
-                "computer-science",
-                "technology",
-                "software",
-                "technical",
-                "non-fiction",
-                "coding"
-            ],
-            "rating": 4.38,
-            "ratings": 21130,
-            "reviews": 1312
-        },
-        {
-            "title": "Book title: Extreme Programming Explained: Embrace Change",
-            "id": "65781",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1386925310i/67833.jpg",
-            "authors": [
-                "Kent Beck"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "software",
-                "non-fiction",
-                "computer-science",
-                "technical",
-                "management"
-            ],
-            "rating": 4.12,
-            "ratings": 3920,
-            "reviews": 209
-        },
-        {
-            "title": "Book title: Structure and Interpretation of Computer Programs",
-            "id": "871745",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1391032527i/43713.jpg",
-            "authors": [
-                "Harold Abelson"
-            ],
-            "genres": [
-                "programming",
-                "computer-science",
-                "technology",
-                "non-fiction",
-                "software",
-                "technical",
-                "computers"
-            ],
-            "rating": 4.46,
-            "ratings": 4648,
-            "reviews": 207
-        },
-        {
-            "title": "Book title: Design Patterns: Elements of Reusable Object-Oriented Software",
-            "id": "1432171",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348027904i/85009.jpg",
-            "authors": [
-                "Erich Gamma"
-            ],
-            "genres": [
-                "programming",
-                "computer-science",
-                "technology",
-                "software",
-                "technical",
-                "non-fiction",
-                "reference"
-            ],
-            "rating": 4.2,
-            "ratings": 11352,
-            "reviews": 410
-        },
-        {
-            "title": "Book title: Effective Java",
-            "id": "101316",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1513389229i/34927404.jpg",
-            "authors": [
-                "Joshua Bloch"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "computer-science",
-                "technical",
-                "software",
-                "non-fiction",
-                "reference"
-            ],
-            "rating": 4.51,
-            "ratings": 7742,
-            "reviews": 402
-        },
-        {
-            "title": "Book title: The Mythical Man-Month: Essays on Software Engineering",
-            "id": "1905885",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348430512i/13629.jpg",
-            "authors": [
-                "Frederick P. Brooks Jr."
-            ],
-            "genres": [
-                "programming",
-                "computer-science",
-                "non-fiction",
-                "technology",
-                "software",
-                "management",
-                "business"
-            ],
-            "rating": 4.01,
-            "ratings": 14145,
-            "reviews": 959
-        },
-        {
-            "title": "Book title: Refactoring: Improving the Design of Existing Code",
-            "id": "44258",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1386925632i/44936.jpg",
-            "authors": [
-                "Martin Fowler"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "computer-science",
-                "software",
-                "technical",
-                "non-fiction",
-                "coding"
-            ],
-            "rating": 4.25,
-            "ratings": 8210,
-            "reviews": 372
-        },
-        {
-            "title": "Book title: The C Programming Language",
-            "id": "3715970",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1391032531i/515601.jpg",
-            "authors": [
-                "Brian W. Kernighan"
-            ],
-            "genres": [
-                "programming",
-                "computer-science",
-                "non-fiction",
-                "reference",
-                "technology",
-                "technical",
-                "computers"
-            ],
-            "rating": 4.44,
-            "ratings": 10658,
-            "reviews": 508
-        },
-        {
-            "title": "Book title: The Pragmatic Programmer: From Journeyman to Master",
+            "title": "The Pragmatic Programmer: From Journeyman to Master",
+            "url": "https://www.goodreads.com/book/show/4099.The_Pragmatic_Programmer",
             "id": "7809",
             "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1401432508i/4099.jpg",
             "authors": [
@@ -181,67 +22,92 @@
             "reviews": 1348
         },
         {
-            "title": "Book title: Domain-Driven Design: Tackling Complexity in the Heart of Software",
-            "id": "173058",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1287493789i/179133.jpg",
+            "title": "Clean Code: A Handbook of Agile Software Craftsmanship",
+            "url": "https://www.goodreads.com/book/show/3735293-clean-code",
+            "id": "3779106",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1436202607i/3735293.jpg",
             "authors": [
-                "Eric Evans"
+                "Robert C. Martin"
             ],
             "genres": [
                 "programming",
+                "computer-science",
                 "technology",
                 "software",
-                "computer-science",
                 "technical",
                 "non-fiction",
-                "architecture"
+                "coding"
             ],
-            "rating": 4.15,
-            "ratings": 5357,
-            "reviews": 286
+            "rating": 4.38,
+            "ratings": 21130,
+            "reviews": 1312
         },
         {
-            "title": "Book title: Grokking Algorithms An Illustrated Guide For Programmers and Other Curious People",
-            "id": "42407946",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1458747997i/22847284.jpg",
+            "title": "The Mythical Man-Month: Essays on Software Engineering",
+            "url": "https://www.goodreads.com/book/show/13629.The_Mythical_Man_Month",
+            "id": "1905885",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348430512i/13629.jpg",
             "authors": [
-                "Aditya Y. Bhargava"
+                "Frederick P. Brooks Jr."
             ],
             "genres": [
                 "programming",
                 "computer-science",
-                "technology",
-                "algorithms",
                 "non-fiction",
-                "technical",
-                "software"
-            ],
-            "rating": 4.41,
-            "ratings": 4140,
-            "reviews": 557
-        },
-        {
-            "title": "Book title: Fundamentals of Software Architecture: An Engineering Approach",
-            "id": "68652888",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1580813753i/44144493.jpg",
-            "authors": [
-                "Mark   Richards"
-            ],
-            "genres": [
                 "technology",
-                "programming",
                 "software",
-                "computer-science",
-                "architecture",
-                "technical",
-                "engineering"
+                "management",
+                "business"
             ],
-            "rating": 4.27,
-            "ratings": 1477,
-            "reviews": 149
+            "rating": 4.01,
+            "ratings": 14145,
+            "reviews": 959
         },
         {
-            "title": "Book title: Code Complete",
+            "title": "Design Patterns: Elements of Reusable Object-Oriented Software",
+            "url": "https://www.goodreads.com/book/show/85009.Design_Patterns",
+            "id": "1432171",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348027904i/85009.jpg",
+            "authors": [
+                "Erich Gamma"
+            ],
+            "genres": [
+                "programming",
+                "computer-science",
+                "technology",
+                "software",
+                "technical",
+                "non-fiction",
+                "reference"
+            ],
+            "rating": 4.2,
+            "ratings": 11352,
+            "reviews": 410
+        },
+        {
+            "title": "The C Programming Language",
+            "url": "https://www.goodreads.com/book/show/515601.The_C_Programming_Language",
+            "id": "3715970",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1391032531i/515601.jpg",
+            "authors": [
+                "Brian W. Kernighan"
+            ],
+            "genres": [
+                "programming",
+                "computer-science",
+                "non-fiction",
+                "reference",
+                "technology",
+                "technical",
+                "computers"
+            ],
+            "rating": 4.44,
+            "ratings": 10659,
+            "reviews": 508
+        },
+        {
+            "title": "Code Complete",
+            "url": "https://www.goodreads.com/book/show/4845.Code_Complete",
             "id": "8419",
             "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1396837641i/4845.jpg",
             "authors": [
@@ -261,127 +127,8 @@
             "reviews": 434
         },
         {
-            "title": "Book title: Building Microservices: Designing Fine-Grained Systems",
-            "id": "41956437",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1403186979i/22512931.jpg",
-            "authors": [
-                "Sam Newman"
-            ],
-            "genres": [
-                "technology",
-                "programming",
-                "computer-science",
-                "software",
-                "technical",
-                "architecture",
-                "non-fiction"
-            ],
-            "rating": 4.21,
-            "ratings": 4736,
-            "reviews": 411
-        },
-        {
-            "title": "Book title: Patterns of Enterprise Application Architecture",
-            "id": "67973",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1440294142i/70156.jpg",
-            "authors": [
-                "Martin Fowler"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "software",
-                "computer-science",
-                "technical",
-                "architecture",
-                "non-fiction"
-            ],
-            "rating": 4.12,
-            "ratings": 3754,
-            "reviews": 149
-        },
-        {
-            "title": "Book title: Introduction to Algorithms",
-            "id": "931060",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1387741681i/108986.jpg",
-            "authors": [
-                "Charles E. Leiserson"
-            ],
-            "genres": [
-                "computer-science",
-                "programming",
-                "algorithms",
-                "technology",
-                "reference",
-                "non-fiction",
-                "technical"
-            ],
-            "rating": 4.35,
-            "ratings": 8880,
-            "reviews": 252
-        },
-        {
-            "title": "Book title: Test-Driven Development: By Example",
-            "id": "376827",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1372039943i/387190.jpg",
-            "authors": [
-                "Kent Beck"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "computer-science",
-                "software",
-                "technical",
-                "non-fiction",
-                "coding"
-            ],
-            "rating": 4.1,
-            "ratings": 4220,
-            "reviews": 220
-        },
-        {
-            "title": "Book title: Designing Data-Intensive Applications",
-            "id": "43055831",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1415816873i/23463279.jpg",
-            "authors": [
-                "Martin Kleppmann"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "computer-science",
-                "software",
-                "technical",
-                "non-fiction",
-                "engineering"
-            ],
-            "rating": 4.71,
-            "ratings": 8054,
-            "reviews": 744
-        },
-        {
-            "title": "Book title: JavaScript: The Good Parts",
-            "id": "3028639",
-            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1328834793i/2998152.jpg",
-            "authors": [
-                "Douglas Crockford"
-            ],
-            "genres": [
-                "programming",
-                "technology",
-                "computer-science",
-                "technical",
-                "non-fiction",
-                "software",
-                "reference"
-            ],
-            "rating": 4.23,
-            "ratings": 8530,
-            "reviews": 553
-        },
-        {
-            "title": "Book title: Head First Design Patterns",
+            "title": "Head First Design Patterns",
+            "url": "https://www.goodreads.com/book/show/58128.Head_First_Design_Patterns",
             "id": "56605",
             "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1408309444i/58128.jpg",
             "authors": [
@@ -401,7 +148,218 @@
             "reviews": 491
         },
         {
-            "title": "Book title: A Philosophy of Software Design",
+            "title": "The Clean Coder: A Code of Conduct for Professional Programmers",
+            "url": "https://www.goodreads.com/book/show/10284614-the-clean-coder",
+            "id": "15186027",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1347470803i/10284614.jpg",
+            "authors": [
+                "Robert C. Martin"
+            ],
+            "genres": [
+                "programming",
+                "computer-science",
+                "technology",
+                "software",
+                "non-fiction",
+                "technical",
+                "coding"
+            ],
+            "rating": 4.27,
+            "ratings": 8547,
+            "reviews": 634
+        },
+        {
+            "title": "Refactoring: Improving the Design of Existing Code",
+            "url": "https://www.goodreads.com/book/show/44936.Refactoring",
+            "id": "44258",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1386925632i/44936.jpg",
+            "authors": [
+                "Martin Fowler"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "computer-science",
+                "software",
+                "technical",
+                "non-fiction",
+                "coding"
+            ],
+            "rating": 4.25,
+            "ratings": 8210,
+            "reviews": 372
+        },
+        {
+            "title": "Designing Data-Intensive Applications",
+            "url": "https://www.goodreads.com/book/show/23463279-designing-data-intensive-applications",
+            "id": "43055831",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1415816873i/23463279.jpg",
+            "authors": [
+                "Martin Kleppmann"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "computer-science",
+                "software",
+                "technical",
+                "non-fiction",
+                "engineering"
+            ],
+            "rating": 4.71,
+            "ratings": 8054,
+            "reviews": 744
+        },
+        {
+            "title": "Clean Architecture",
+            "url": "https://www.goodreads.com/book/show/18043011-clean-architecture",
+            "id": "25319615",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1471680093i/18043011.jpg",
+            "authors": [
+                "Robert C. Martin"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "computer-science",
+                "software",
+                "technical",
+                "non-fiction",
+                "coding"
+            ],
+            "rating": 4.23,
+            "ratings": 5892,
+            "reviews": 438
+        },
+        {
+            "title": "Domain-Driven Design: Tackling Complexity in the Heart of Software",
+            "url": "https://www.goodreads.com/book/show/179133.Domain_Driven_Design",
+            "id": "173058",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1287493789i/179133.jpg",
+            "authors": [
+                "Eric Evans"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "software",
+                "computer-science",
+                "technical",
+                "non-fiction",
+                "architecture"
+            ],
+            "rating": 4.15,
+            "ratings": 5357,
+            "reviews": 286
+        },
+        {
+            "title": "Building Microservices: Designing Fine-Grained Systems",
+            "url": "https://www.goodreads.com/book/show/22512931-building-microservices",
+            "id": "41956437",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1403186979i/22512931.jpg",
+            "authors": [
+                "Sam Newman"
+            ],
+            "genres": [
+                "technology",
+                "programming",
+                "computer-science",
+                "software",
+                "technical",
+                "architecture",
+                "non-fiction"
+            ],
+            "rating": 4.21,
+            "ratings": 4736,
+            "reviews": 411
+        },
+        {
+            "title": "Working Effectively with Legacy Code",
+            "url": "https://www.goodreads.com/book/show/44919.Working_Effectively_with_Legacy_Code",
+            "id": "44241",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348627451i/44919.jpg",
+            "authors": [
+                "Michael C. Feathers"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "computer-science",
+                "software",
+                "technical",
+                "non-fiction",
+                "coding"
+            ],
+            "rating": 4.14,
+            "ratings": 4483,
+            "reviews": 272
+        },
+        {
+            "title": "Test-Driven Development: By Example",
+            "url": "https://www.goodreads.com/book/show/387190.Test_Driven_Development",
+            "id": "376827",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1372039943i/387190.jpg",
+            "authors": [
+                "Kent Beck"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "computer-science",
+                "software",
+                "technical",
+                "non-fiction",
+                "coding"
+            ],
+            "rating": 4.1,
+            "ratings": 4220,
+            "reviews": 220
+        },
+        {
+            "title": "Grokking Algorithms An Illustrated Guide For Programmers and Other Curious People",
+            "url": "https://www.goodreads.com/book/show/22847284-grokking-algorithms-an-illustrated-guide-for-programmers-and-other-curio",
+            "id": "42407946",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1458747997i/22847284.jpg",
+            "authors": [
+                "Aditya Y. Bhargava"
+            ],
+            "genres": [
+                "programming",
+                "computer-science",
+                "technology",
+                "algorithms",
+                "non-fiction",
+                "technical",
+                "software"
+            ],
+            "rating": 4.41,
+            "ratings": 4140,
+            "reviews": 557
+        },
+        {
+            "title": "Extreme Programming Explained: Embrace Change",
+            "url": "https://www.goodreads.com/book/show/67833.Extreme_Programming_Explained",
+            "id": "65781",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1386925310i/67833.jpg",
+            "authors": [
+                "Kent Beck"
+            ],
+            "genres": [
+                "programming",
+                "technology",
+                "software",
+                "non-fiction",
+                "computer-science",
+                "technical",
+                "management"
+            ],
+            "rating": 4.12,
+            "ratings": 3920,
+            "reviews": 209
+        },
+        {
+            "title": "A Philosophy of Software Design",
+            "url": "https://www.goodreads.com/book/show/39996759-a-philosophy-of-software-design",
             "id": "61938796",
             "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1531857377i/39996759.jpg",
             "authors": [
@@ -419,6 +377,48 @@
             "rating": 4.2,
             "ratings": 3111,
             "reviews": 390
+        },
+        {
+            "title": "Fundamentals of Software Architecture: An Engineering Approach",
+            "url": "https://www.goodreads.com/book/show/44144493-fundamentals-of-software-architecture",
+            "id": "68652888",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1580813753i/44144493.jpg",
+            "authors": [
+                "Mark   Richards"
+            ],
+            "genres": [
+                "technology",
+                "programming",
+                "software",
+                "computer-science",
+                "architecture",
+                "technical",
+                "engineering"
+            ],
+            "rating": 4.27,
+            "ratings": 1477,
+            "reviews": 149
+        },
+        {
+            "title": "Modern Software Engineering: Doing What Works to Build Better Software Faster",
+            "url": "https://www.goodreads.com/book/show/57345270-modern-software-engineering",
+            "id": "89753499",
+            "cover_url": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1633733111i/57345270.jpg",
+            "authors": [
+                "David  Farley"
+            ],
+            "genres": [
+                "programming",
+                "software",
+                "technology",
+                "computer-science",
+                "technical",
+                "non-fiction",
+                "engineering"
+            ],
+            "rating": 4.2,
+            "ratings": 662,
+            "reviews": 84
         }
     ]
 }

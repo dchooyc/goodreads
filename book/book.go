@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	BookTitlePrefix      = "Book title: "
 	BookURLIndicator     = "/book/show/"
 	BookIDIndicator      = "/work/quotes/"
 	BookCoverIndicator   = "BookCover__image"
@@ -25,6 +26,7 @@ type Books struct {
 
 type Book struct {
 	Title    string   `json:"title"`
+	URL      string   `json:"url"`
 	ID       string   `json:"id"`
 	CoverUrl string   `json:"cover_url"`
 	Authors  []string `json:"authors"`
@@ -236,7 +238,7 @@ func ExtractTitle(n *html.Node, curBook *Book) {
 			correctData = true
 		}
 		if attr.Key == "aria-label" {
-			title = attr.Val
+			title = attr.Val[len(BookTitlePrefix):]
 		}
 	}
 	if correctClass && correctData {

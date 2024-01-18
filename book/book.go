@@ -19,15 +19,19 @@ const (
 	BookStatsIndicator   = "RatingStatistics__meta"
 )
 
+type Books struct {
+	Books []Book `json:"books"`
+}
+
 type Book struct {
-	Title    string
-	ID       string
-	CoverUrl string
-	Authors  []string
-	Genres   []string
-	Rating   float64
-	Ratings  int
-	Reviews  int
+	Title    string   `json:"title"`
+	ID       string   `json:"id"`
+	CoverUrl string   `json:"cover_url"`
+	Authors  []string `json:"authors"`
+	Genres   []string `json:"genres"`
+	Rating   float64  `json:"rating"`
+	Ratings  int      `json:"ratings"`
+	Reviews  int      `json:"reviews"`
 }
 
 func GetBookURLs(r io.Reader) ([]string, error) {

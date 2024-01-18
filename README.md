@@ -4,6 +4,10 @@
 
     go run main.go -url <goodreads_book_url> -genre <genre_of_books> -depth <depth_to_search>
 
+### Output location
+
+    output.json
+
 ### How to create binary
 
     go build

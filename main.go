@@ -49,6 +49,7 @@ func bfs(urlStr string, maxDepth int) book.Books {
 		for _, url := range q {
 			if _, ok := urlToBook[url]; !ok {
 				b := getBook(url)
+				b.URL = url
 				fmt.Println(b.Title)
 				if b != nil && len(b.ID) != 0 && i < maxDepth-1 {
 					simBooks := similarPrefix + b.ID

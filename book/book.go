@@ -1,6 +1,7 @@
 package book
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -11,6 +12,7 @@ const (
 	BookIDIndicator      = "/work/quotes/"
 	BookCoverIndicator   = "BookCover__image"
 	BookAuthorsIndicator = "ContributorLinksList"
+	BookGenresIndicator  = "/genres/"
 )
 
 type Book struct {
@@ -34,7 +36,7 @@ func Parse(r io.Reader) ([]*Book, error) {
 }
 
 func FindBooks(n *html.Node) ([]*Book, error) {
-	// fmt.Printf("%#v\n", n)
+	fmt.Printf("%#v\n", n)
 	curBook := &Book{}
 	ExtractBookInfo(n, curBook)
 	return []*Book{curBook}, nil
@@ -43,6 +45,7 @@ func FindBooks(n *html.Node) ([]*Book, error) {
 func ExtractBookInfo(n *html.Node, curBook *Book) {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		ExtractID(n, curBook)
+		ExtractGenres(n, curBook)
 	}
 	if n.Type == html.ElementNode && n.Data == "div" {
 		ExtractCover(n, curBook)
@@ -53,6 +56,20 @@ func ExtractBookInfo(n *html.Node, curBook *Book) {
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ExtractBookInfo(c, curBook)
+	}
+}
+
+func ExtractGenres(n *html.Node, curBook *Book) {
+	for _, attr := range n.Attr {
+		if attr.Key == "href" {
+			url := attr.Val
+			if strings.Contains(url, BookGenresIndicator) {
+				parts := strings.Split(url, "/")
+				genre := parts[len(parts)-1]
+				curBook.Genres = append(curBook.Genres, genre)
+			}
+			break
+		}
 	}
 }
 

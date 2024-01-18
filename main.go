@@ -7,6 +7,7 @@ import (
 	"goodreads/book"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 )
 
@@ -16,7 +17,8 @@ const (
 )
 
 func main() {
-	rootUrl := flag.String("url", "https://www.goodreads.com", "The url to begin crawling from")
+	rootUrl := flag.String("url", goodreadsPrefix+"/book/show/4099.The_Pragmatic_Programmer", "The url to begin crawling from")
+	genre := flag.String("genre", "computer-science", "A genre to target")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	flag.Parse()
 
@@ -25,7 +27,7 @@ func main() {
 		panic(err)
 	}
 
-	books := bfs(*rootUrl, *maxDepth)
+	books := bfs(*rootUrl, *genre, *maxDepth)
 
 	jsonData, err := json.Marshal(books)
 	if err != nil {
@@ -38,7 +40,7 @@ func main() {
 	}
 }
 
-func bfs(urlStr string, maxDepth int) book.Books {
+func bfs(urlStr, genre string, maxDepth int) book.Books {
 	urlToBook := make(map[string]*book.Book)
 	q := []string{urlStr}
 
@@ -51,7 +53,7 @@ func bfs(urlStr string, maxDepth int) book.Books {
 				b := getBook(url)
 				b.URL = url
 				fmt.Println(b.Title)
-				if b != nil && len(b.ID) != 0 && i < maxDepth-1 {
+				if b != nil && len(b.ID) != 0 && i < maxDepth-1 && contains(b.Genres, genre) {
 					simBooks := similarPrefix + b.ID
 					simBooksURLs := getBookURLs(simBooks)
 					for _, sbu := range simBooksURLs {
@@ -65,12 +67,25 @@ func bfs(urlStr string, maxDepth int) book.Books {
 		}
 		q = q2
 	}
-	res, i := make([]book.Book, len(urlToBook)), 0
+	res := []book.Book{}
 	for _, b := range urlToBook {
-		res[i] = *b
-		i++
+		if contains(b.Genres, genre) {
+			res = append(res, *b)
+		}
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Ratings > res[j].Ratings
+	})
 	return book.Books{Books: res}
+}
+
+func contains(arr []string, target string) bool {
+	for _, val := range arr {
+		if val == target {
+			return true
+		}
+	}
+	return false
 }
 
 func getBookURLs(urlString string) []string {
@@ -88,7 +103,7 @@ func getBookURLs(urlString string) []string {
 		fullURLs[goodreadsPrefix+url] = true
 	}
 	res, i := make([]string, len(fullURLs)), 0
-	for url, _ := range fullURLs {
+	for url := range fullURLs {
 		res[i] = url
 		i++
 	}

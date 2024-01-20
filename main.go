@@ -19,10 +19,11 @@ const (
 func main() {
 	rootUrl := flag.String("url", goodreadsPrefix+"/book/show/4099.The_Pragmatic_Programmer", "The url to begin crawling from")
 	genre := flag.String("genre", "computer-science", "A genre to target")
+	target := flag.String("target", "output.json", "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	flag.Parse()
 
-	file, err := os.Create("output.json")
+	file, err := os.Create(*target)
 	if err != nil {
 		panic(err)
 	}

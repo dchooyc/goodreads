@@ -183,24 +183,28 @@ func ExtractAuthors(n *html.Node, curBook *Book) {
 	for _, attr := range n.Attr {
 		if attr.Key == "class" && attr.Val == BookAuthorsIndicator {
 			authors := []string{}
+
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				aNode := c.FirstChild
 				if aNode == nil || aNode.Data != "a" {
 					continue
 				}
+
 				spanNode := aNode.FirstChild
 				if spanNode == nil || spanNode.Data != "span" {
 					continue
 				}
+
 				name := spanNode.FirstChild
 				if name.Type != html.TextNode {
 					continue
 				}
+
 				authors = append(authors, name.Data)
 			}
-			if len(authors) != 0 {
-				curBook.Authors = authors
-			}
+
+			curBook.Authors = authors
+			break
 		}
 	}
 }
@@ -212,22 +216,32 @@ func ExtractCover(n *html.Node, curBook *Book) {
 			if targetDiv == nil {
 				continue
 			}
+
 			imageNode := targetDiv.FirstChild
 			if imageNode == nil || imageNode.Data != "img" {
 				continue
 			}
+
 			correctClass, correctRole, imgSRC := false, false, ""
+
 			for _, attr := range imageNode.Attr {
 				if attr.Key == "class" && attr.Val == "ResponsiveImage" {
 					correctClass = true
 				}
+
 				if attr.Key == "role" && attr.Val == "presentation" {
 					correctRole = true
 				}
+
 				if attr.Key == "src" {
 					imgSRC = attr.Val
 				}
+
+				if correctClass && correctRole && imgSRC != "" {
+					break
+				}
 			}
+
 			if correctClass && correctRole {
 				curBook.CoverUrl = imgSRC
 			}
@@ -239,11 +253,13 @@ func ExtractID(n *html.Node, curBook *Book) {
 	for _, attr := range n.Attr {
 		if attr.Key == "href" {
 			url := attr.Val
+
 			if strings.Contains(url, BookIDIndicator) {
 				parts := strings.Split(url, "/")
 				id := parts[len(parts)-1]
 				curBook.ID = id
 			}
+
 			break
 		}
 	}
@@ -251,17 +267,25 @@ func ExtractID(n *html.Node, curBook *Book) {
 
 func ExtractTitle(n *html.Node, curBook *Book) {
 	correctClass, correctData, title := false, false, ""
+
 	for _, attr := range n.Attr {
 		if attr.Key == "class" && attr.Val == "Text Text__title1" {
 			correctClass = true
 		}
+
 		if attr.Key == "data-testid" && attr.Val == "bookTitle" {
 			correctData = true
 		}
+
 		if attr.Key == "aria-label" {
 			title = attr.Val[len(BookTitlePrefix):]
 		}
+
+		if correctClass && correctData && title != "" {
+			break
+		}
 	}
+
 	if correctClass && correctData {
 		curBook.Title = title
 	}

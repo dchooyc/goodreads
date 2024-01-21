@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	similarPrefix   = "https://www.goodreads.com/book/similar/"
-	goodreadsPrefix = "https://www.goodreads.com"
+	goodreadsPrefix     = "https://www.goodreads.com"
+	similarPath         = "/book/similar/"
+	pragmaticProgrammer = goodreadsPrefix + "/book/show/4099.The_Pragmatic_Programmer"
+	output              = "output.json"
 )
 
 func main() {
-	rootUrl := flag.String("url", goodreadsPrefix+"/book/show/4099.The_Pragmatic_Programmer", "The url to begin crawling from")
-	genre := flag.String("genre", "computer-science", "A genre to target")
-	target := flag.String("target", "output.json", "Output location")
+	rootUrl := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
+	target := flag.String("target", output, "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	flag.Parse()
 
@@ -28,7 +29,7 @@ func main() {
 		panic(err)
 	}
 
-	books := bfs(*rootUrl, *genre, *maxDepth)
+	books := getBooks(*rootUrl, *maxDepth)
 
 	jsonData, err := json.Marshal(books)
 	if err != nil {
@@ -41,54 +42,74 @@ func main() {
 	}
 }
 
-func bfs(urlStr, genre string, maxDepth int) book.Books {
+func getBooks(urlStr string, maxDepth int) book.Books {
 	urlToBook := make(map[string]*book.Book)
-	q := []string{urlStr}
+	queue, next := []string{urlStr}, []string{}
 
-	for i := 0; i < maxDepth; i++ {
+	for i := 1; i <= maxDepth; i++ {
 		fmt.Println("depth: " + strconv.Itoa(i))
-		fmt.Println("books: " + strconv.Itoa(len(q)))
-		q2 := []string{}
-		for _, url := range q {
-			if _, ok := urlToBook[url]; !ok {
-				b := getBook(url)
-				b.URL = url
-				fmt.Println(b.Title)
-				if b != nil && len(b.ID) != 0 && i < maxDepth-1 && contains(b.Genres, genre) {
-					simBooks := similarPrefix + b.ID
-					simBooksURLs := getBookURLs(simBooks)
-					for _, sbu := range simBooksURLs {
-						if _, ok := urlToBook[sbu]; !ok {
-							q2 = append(q2, sbu)
-						}
+		fmt.Println("books: " + strconv.Itoa(len(queue)))
+		isLast := false
+
+		if i == maxDepth {
+			isLast = true
+		}
+
+		processQueue(isLast, &queue, &next, urlToBook)
+	}
+
+	return arrangeBooks(urlToBook)
+}
+
+func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
+	arranged, i := make([]book.Book, len(urlToBook)), 0
+
+	for _, curBook := range urlToBook {
+		arranged[i] = *curBook
+		i++
+	}
+
+	sort.Slice(arranged, func(i, j int) bool {
+		return arranged[i].Ratings > arranged[j].Ratings
+	})
+
+	return book.Books{Books: arranged}
+}
+
+func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book.Book) {
+	for _, url := range *queue {
+		if _, ok := urlToBook[url]; !ok {
+			curBook := getBook(url)
+			// error handling here
+			if curBook == nil {
+				continue
+			}
+
+			curBook.URL = url
+			fmt.Println(curBook.Title)
+
+			id := curBook.ID
+
+			if id != "" && !isLast {
+				simBooks := goodreadsPrefix + similarPath + id
+				// error handling here
+				simBooksURLs := getBookURLs(simBooks)
+
+				for _, sbu := range simBooksURLs {
+					if _, ok := urlToBook[sbu]; !ok {
+						*next = append(*next, sbu)
 					}
 				}
-				urlToBook[url] = b
 			}
-		}
-		q = q2
-	}
-	res := []book.Book{}
-	for _, b := range urlToBook {
-		if contains(b.Genres, genre) {
-			res = append(res, *b)
+
+			urlToBook[url] = curBook
 		}
 	}
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].Ratings > res[j].Ratings
-	})
-	return book.Books{Books: res}
+
+	*queue, *next = *next, []string{}
 }
 
-func contains(arr []string, target string) bool {
-	for _, val := range arr {
-		if val == target {
-			return true
-		}
-	}
-	return false
-}
-
+// to do: error handling
 func getBookURLs(urlString string) []string {
 	resp, err := http.Get(urlString)
 	if err != nil {
@@ -111,6 +132,7 @@ func getBookURLs(urlString string) []string {
 	return res
 }
 
+// to do: error handling here
 func getBook(urlString string) *book.Book {
 	resp, err := http.Get(urlString)
 	if err != nil {

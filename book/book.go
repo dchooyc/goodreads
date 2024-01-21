@@ -38,11 +38,14 @@ type Book struct {
 
 func GetBookURLs(r io.Reader) ([]string, error) {
 	bookURLs := []string{}
+
 	doc, err := html.Parse(r)
 	if err != nil {
 		return nil, err
 	}
+
 	ExtractURLs(doc, &bookURLs)
+
 	return bookURLs, nil
 }
 
@@ -51,13 +54,16 @@ func ExtractURLs(n *html.Node, urls *[]string) {
 		for _, attr := range n.Attr {
 			if attr.Key == "href" {
 				url := attr.Val
+
 				if strings.HasPrefix(url, BookURLIndicator) {
 					*urls = append(*urls, url)
 				}
+
 				break
 			}
 		}
 	}
+
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ExtractURLs(c, urls)
 	}
@@ -68,14 +74,12 @@ func GetBook(r io.Reader) (*Book, error) {
 	if err != nil {
 		return nil, err
 	}
-	book := CreateBook(doc)
-	return book, nil
-}
 
-func CreateBook(n *html.Node) *Book {
-	curBook := &Book{}
-	ExtractBookInfo(n, curBook)
-	return curBook
+	book := &Book{}
+
+	ExtractBookInfo(doc, book)
+
+	return book, nil
 }
 
 func ExtractBookInfo(n *html.Node, curBook *Book) {
@@ -83,15 +87,18 @@ func ExtractBookInfo(n *html.Node, curBook *Book) {
 		ExtractID(n, curBook)
 		ExtractGenres(n, curBook)
 	}
+
 	if n.Type == html.ElementNode && n.Data == "div" {
 		ExtractCover(n, curBook)
 		ExtractRating(n, curBook)
 		ExtractStats(n, curBook)
 		ExtractAuthors(n, curBook)
 	}
+
 	if n.Type == html.ElementNode && n.Data == "h1" {
 		ExtractTitle(n, curBook)
 	}
+
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ExtractBookInfo(c, curBook)
 	}
@@ -101,45 +108,57 @@ func ExtractRating(n *html.Node, curBook *Book) {
 	for _, attr := range n.Attr {
 		if attr.Key == "class" && attr.Val == BookRatingIndicator {
 			textNode := n.FirstChild
+
 			if textNode != nil {
 				val, err := strconv.ParseFloat(textNode.Data, 64)
 				if err != nil {
 					fmt.Println(err)
-					break
 				}
+
 				curBook.Rating = val
 			}
+
+			break
 		}
 	}
 }
 
 func ExtractStats(n *html.Node, curBook *Book) {
 	correctClass, val := false, ""
+
 	for _, attr := range n.Attr {
 		if attr.Key == "class" && attr.Val == BookStatsIndicator {
 			correctClass = true
 		}
+
 		if attr.Key == "aria-label" {
 			val = attr.Val
 		}
+
+		if correctClass && val != "" {
+			break
+		}
 	}
+
 	if correctClass {
 		parts := strings.Split(val, " ")
 		ratings := parts[0]
 		reviews := parts[3]
 		ratings = strings.Join(strings.Split(ratings, ","), "")
 		reviews = strings.Join(strings.Split(reviews, ","), "")
+
 		ratingsVal, err := strconv.Atoi(ratings)
 		if err != nil {
 			fmt.Println(err)
-			return
 		}
+
 		curBook.Ratings = ratingsVal
+
 		reviewsVal, err := strconv.Atoi(reviews)
 		if err != nil {
 			fmt.Println(err)
-			return
 		}
+
 		curBook.Reviews = reviewsVal
 	}
 }
@@ -148,11 +167,13 @@ func ExtractGenres(n *html.Node, curBook *Book) {
 	for _, attr := range n.Attr {
 		if attr.Key == "href" {
 			url := attr.Val
+
 			if strings.Contains(url, BookGenresIndicator) {
 				parts := strings.Split(url, "/")
 				genre := parts[len(parts)-1]
 				curBook.Genres = append(curBook.Genres, genre)
 			}
+
 			break
 		}
 	}

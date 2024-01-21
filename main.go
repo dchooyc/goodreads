@@ -79,9 +79,10 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book.Book) {
 	for _, url := range *queue {
 		if _, ok := urlToBook[url]; !ok {
-			curBook := getBook(url)
-			// error handling here
-			if curBook == nil {
+			curBook, err := getBook(url)
+			if err != nil {
+				formattedError := fmt.Errorf("error getting %s: %w", url, err)
+				fmt.Println(formattedError)
 				continue
 			}
 
@@ -145,16 +146,18 @@ func getBookURLs(urlString string) ([]string, error) {
 	return bookURLs, nil
 }
 
-// to do: error handling here
-func getBook(urlString string) *book.Book {
+func getBook(urlString string) (*book.Book, error) {
 	resp, err := http.Get(urlString)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("http get failed: %w", err)
 	}
+
 	defer resp.Body.Close()
-	b, err := book.GetBook(resp.Body)
+
+	curBook, err := book.GetBook(resp.Body)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("get book details failed: %w", err)
 	}
-	return b
+
+	return curBook, nil
 }

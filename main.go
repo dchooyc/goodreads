@@ -59,7 +59,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 
 func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
 	urlToBook := make(map[string]*book.Book)
-	queue, next := []string{urlStr}, []string{}
+	queue := []string{urlStr}
 
 	for i := 1; i <= maxDepth; i++ {
 		fmt.Println("depth: " + strconv.Itoa(i))
@@ -70,14 +70,16 @@ func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
 			isLast = true
 		}
 
-		processQueue(isLast, &queue, &next, urlToBook)
+		queue = processQueue(isLast, queue, urlToBook)
 	}
 
 	return urlToBook
 }
 
-func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book.Book) {
-	for _, url := range *queue {
+func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) []string {
+	next := []string{}
+
+	for _, url := range queue {
 		if _, ok := urlToBook[url]; !ok {
 			curBook, err := getBook(url)
 			if err != nil {
@@ -101,7 +103,7 @@ func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book
 
 				for _, bookURL := range bookURLs {
 					if _, ok := urlToBook[bookURL]; !ok {
-						*next = append(*next, bookURL)
+						next = append(next, bookURL)
 					}
 				}
 			}
@@ -110,7 +112,7 @@ func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book
 		}
 	}
 
-	*queue, *next = *next, []string{}
+	return next
 }
 
 func getBookURLs(id string) ([]string, error) {

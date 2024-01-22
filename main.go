@@ -92,7 +92,18 @@ func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book
 			id := curBook.ID
 
 			if id != "" && !isLast {
-				getSimBooks(id, next, urlToBook)
+				bookURLs, err := getBookURLs(id)
+
+				if err != nil {
+					formattedError := fmt.Errorf("error getting similar books %s: %w", id, err)
+					fmt.Println(formattedError)
+				}
+
+				for _, bookURL := range bookURLs {
+					if _, ok := urlToBook[bookURL]; !ok {
+						*next = append(*next, bookURL)
+					}
+				}
 			}
 
 			urlToBook[url] = curBook
@@ -102,23 +113,9 @@ func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book
 	*queue, *next = *next, []string{}
 }
 
-func getSimBooks(id string, next *[]string, urlToBook map[string]*book.Book) {
+func getBookURLs(id string) ([]string, error) {
 	path := goodreadsPrefix + similarPath + id
-	simBooks, err := getBookURLs(path)
-	if err != nil {
-		fmt.Println("get similar books urls failed: ", err)
-		return
-	}
-
-	for _, url := range simBooks {
-		if _, ok := urlToBook[url]; !ok {
-			*next = append(*next, url)
-		}
-	}
-}
-
-func getBookURLs(urlString string) ([]string, error) {
-	resp, err := http.Get(urlString)
+	resp, err := http.Get(path)
 	if err != nil {
 		return nil, fmt.Errorf("http get failed: %w", err)
 	}

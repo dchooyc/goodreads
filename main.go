@@ -18,6 +18,12 @@ const (
 	output              = "output.json"
 )
 
+type processedBook struct {
+	book         *book.Book
+	err          error
+	similarBooks []string
+}
+
 func main() {
 	rootUrl := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
 	target := flag.String("target", output, "Output location")
@@ -43,11 +49,12 @@ func main() {
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
-	arranged, i := make([]book.Book, len(urlToBook)), 0
+	arranged := []book.Book{}
 
 	for _, curBook := range urlToBook {
-		arranged[i] = *curBook
-		i++
+		if curBook != nil {
+			arranged = append(arranged, *curBook)
+		}
 	}
 
 	sort.Slice(arranged, func(i, j int) bool {
@@ -80,39 +87,48 @@ func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) 
 	next := []string{}
 
 	for _, url := range queue {
-		if _, ok := urlToBook[url]; !ok {
-			curBook, err := getBook(url)
-			if err != nil {
-				formattedError := fmt.Errorf("error getting %s: %w", url, err)
-				fmt.Println(formattedError)
-				continue
+		pBook := processBook(isLast, url)
+		if pBook.err != nil {
+			fmt.Println(pBook.err)
+			continue
+		}
+		urlToBook[url] = pBook.book
+
+		for _, bookURL := range pBook.similarBooks {
+			if _, ok := urlToBook[bookURL]; !ok {
+				next = append(next, bookURL)
 			}
-
-			curBook.URL = url
-			fmt.Println(curBook.Title)
-
-			id := curBook.ID
-
-			if id != "" && !isLast {
-				bookURLs, err := getBookURLs(id)
-
-				if err != nil {
-					formattedError := fmt.Errorf("error getting similar books %s: %w", id, err)
-					fmt.Println(formattedError)
-				}
-
-				for _, bookURL := range bookURLs {
-					if _, ok := urlToBook[bookURL]; !ok {
-						next = append(next, bookURL)
-					}
-				}
-			}
-
-			urlToBook[url] = curBook
 		}
 	}
 
 	return next
+}
+
+func processBook(isLast bool, url string) *processedBook {
+	res := &processedBook{}
+
+	curBook, err := getBook(url)
+	if err != nil {
+		res.err = fmt.Errorf("error getting %s: %w", url, err)
+		return res
+	}
+
+	curBook.URL = url
+	fmt.Println(curBook.Title)
+	res.book = curBook
+	id := curBook.ID
+
+	if id != "" && !isLast {
+		bookURLs, err := getBookURLs(id)
+		if err != nil {
+			res.err = fmt.Errorf("error getting similar books %s: %w", id, err)
+			return res
+		}
+
+		res.similarBooks = bookURLs
+	}
+
+	return res
 }
 
 func getBookURLs(id string) ([]string, error) {

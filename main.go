@@ -29,7 +29,7 @@ func main() {
 		panic(err)
 	}
 
-	books := getBooks(*rootUrl, *maxDepth)
+	books := arrangeBooks(findBooks(*rootUrl, *maxDepth))
 
 	jsonData, err := json.Marshal(books)
 	if err != nil {
@@ -40,25 +40,6 @@ func main() {
 	if err != nil {
 		fmt.Println("writing to file: ", err)
 	}
-}
-
-func getBooks(urlStr string, maxDepth int) book.Books {
-	urlToBook := make(map[string]*book.Book)
-	queue, next := []string{urlStr}, []string{}
-
-	for i := 1; i <= maxDepth; i++ {
-		fmt.Println("depth: " + strconv.Itoa(i))
-		fmt.Println("books: " + strconv.Itoa(len(queue)))
-		isLast := false
-
-		if i == maxDepth {
-			isLast = true
-		}
-
-		processQueue(isLast, &queue, &next, urlToBook)
-	}
-
-	return arrangeBooks(urlToBook)
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
@@ -74,6 +55,25 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	})
 
 	return book.Books{Books: arranged}
+}
+
+func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
+	urlToBook := make(map[string]*book.Book)
+	queue, next := []string{urlStr}, []string{}
+
+	for i := 1; i <= maxDepth; i++ {
+		fmt.Println("depth: " + strconv.Itoa(i))
+		fmt.Println("books: " + strconv.Itoa(len(queue)))
+		isLast := false
+
+		if i == maxDepth {
+			isLast = true
+		}
+
+		processQueue(isLast, &queue, &next, urlToBook)
+	}
+
+	return urlToBook
 }
 
 func processQueue(isLast bool, queue, next *[]string, urlToBook map[string]*book.Book) {

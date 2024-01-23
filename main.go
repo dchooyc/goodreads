@@ -29,6 +29,7 @@ func main() {
 	rootUrl := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
 	target := flag.String("target", output, "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
+	numWorkers := flag.Int("workers", 10, "The number of workers to process books")
 	flag.Parse()
 
 	file, err := os.Create(*target)
@@ -36,7 +37,7 @@ func main() {
 		panic(err)
 	}
 
-	books := arrangeBooks(findBooks(*rootUrl, *maxDepth))
+	books := arrangeBooks(findBooks(*rootUrl, *maxDepth, *numWorkers))
 
 	jsonData, err := json.Marshal(books)
 	if err != nil {
@@ -65,7 +66,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	return book.Books{Books: arranged}
 }
 
-func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
+func findBooks(urlStr string, maxDepth, numWorkers int) map[string]*book.Book {
 	urlToBook := make(map[string]*book.Book)
 	queue := []string{urlStr}
 
@@ -78,21 +79,19 @@ func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
 			isLast = true
 		}
 
-		queue = processQueue(isLast, queue, urlToBook)
+		queue = processQueue(isLast, numWorkers, queue, urlToBook)
 	}
 
 	return urlToBook
 }
 
-func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) []string {
+func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book) []string {
 	next := []string{}
 	urls := make(chan string, len(queue))
 	processedBooks := make(chan *processedBook, len(queue))
 	var wg sync.WaitGroup
 
-	for i := 0; i < 10; i++ {
-		go worker(i, isLast, urls, processedBooks, &wg)
-	}
+	createWorkers(min(len(queue), numWorkers), isLast, urls, processedBooks, &wg)
 
 	for _, url := range queue {
 		wg.Add(1)
@@ -122,6 +121,19 @@ func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) 
 	}
 
 	return next
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func createWorkers(numWorkers int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {
+	for w := 0; w < numWorkers; w++ {
+		go worker(w, isLast, urls, processedBooks, wg)
+	}
 }
 
 func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {

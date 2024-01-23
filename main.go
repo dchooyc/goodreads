@@ -54,7 +54,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	arranged := []book.Book{}
 
 	for _, curBook := range urlToBook {
-		if curBook != nil {
+		if curBook != nil && isEnglish(curBook.Title) {
 			arranged = append(arranged, *curBook)
 		}
 	}
@@ -160,7 +160,7 @@ func processBook(isLast bool, url string) *processedBook {
 	res.book = curBook
 	id := curBook.ID
 
-	if id != "" && !isLast {
+	if id != "" && !isLast && isEnglish(curBook.Title) {
 		bookURLs, err := getBookURLs(id)
 		if err != nil {
 			res.err = fmt.Errorf("error getting similar books %s: %w", id, err)
@@ -171,6 +171,15 @@ func processBook(isLast bool, url string) *processedBook {
 	}
 
 	return res
+}
+
+func isEnglish(text string) bool {
+	for _, char := range text {
+		if char > 127 {
+			return false
+		}
+	}
+	return true
 }
 
 func getBookURLs(id string) ([]string, error) {

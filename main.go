@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -85,14 +86,33 @@ func findBooks(urlStr string, maxDepth int) map[string]*book.Book {
 
 func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) []string {
 	next := []string{}
+	urls := make(chan string, len(queue))
+	processedBooks := make(chan *processedBook, len(queue))
+	var wg sync.WaitGroup
+
+	for i := 0; i < 10; i++ {
+		go worker(i, isLast, urls, processedBooks, &wg)
+	}
 
 	for _, url := range queue {
-		pBook := processBook(isLast, url)
+		wg.Add(1)
+		urls <- url
+	}
+
+	close(urls)
+
+	go func() {
+		wg.Wait()
+		close(processedBooks)
+	}()
+
+	for pBook := range processedBooks {
 		if pBook.err != nil {
 			fmt.Println(pBook.err)
 			continue
 		}
-		urlToBook[url] = pBook.book
+
+		urlToBook[pBook.book.URL] = pBook.book
 
 		for _, bookURL := range pBook.similarBooks {
 			if _, ok := urlToBook[bookURL]; !ok {
@@ -102,6 +122,17 @@ func processQueue(isLast bool, queue []string, urlToBook map[string]*book.Book) 
 	}
 
 	return next
+}
+
+func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {
+	for url := range urls {
+		pBook := processBook(isLast, url)
+		if pBook.book != nil {
+			fmt.Printf("Worker %d: %s\n", workerID, pBook.book.Title)
+		}
+		processedBooks <- pBook
+		wg.Done()
+	}
 }
 
 func processBook(isLast bool, url string) *processedBook {
@@ -114,7 +145,6 @@ func processBook(isLast bool, url string) *processedBook {
 	}
 
 	curBook.URL = url
-	fmt.Println(curBook.Title)
 	res.book = curBook
 	id := curBook.ID
 

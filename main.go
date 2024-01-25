@@ -86,7 +86,6 @@ func findBooks(urlStr string, maxDepth, numWorkers int) map[string]*book.Book {
 }
 
 func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book) []string {
-	next := []string{}
 	urls := make(chan string, len(queue))
 	processedBooks := make(chan *processedBook, len(queue))
 	var wg sync.WaitGroup
@@ -105,6 +104,8 @@ func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[str
 		close(processedBooks)
 	}()
 
+	collect := make(map[string]bool)
+
 	for pBook := range processedBooks {
 		if pBook.err != nil {
 			fmt.Println(pBook.err)
@@ -114,9 +115,15 @@ func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[str
 		urlToBook[pBook.book.URL] = pBook.book
 
 		for _, bookURL := range pBook.similarBooks {
-			if _, ok := urlToBook[bookURL]; !ok {
-				next = append(next, bookURL)
-			}
+			collect[bookURL] = true
+		}
+	}
+
+	next := []string{}
+
+	for url := range collect {
+		if _, ok := urlToBook[url]; !ok {
+			next = append(next, url)
 		}
 	}
 
@@ -136,9 +143,12 @@ func createWorkers(numWorkers int, isLast bool, urls <-chan string, processedBoo
 	}
 }
 
+// give worker more details
 func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {
 	for url := range urls {
 		pBook := processBook(isLast, url)
+		// do proper logging here
+		// add depth and count
 		if pBook.book != nil {
 			fmt.Printf("Worker %d: %s\n", workerID, pBook.book.Title)
 		}

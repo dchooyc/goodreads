@@ -29,7 +29,7 @@ func main() {
 	rootUrl := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
 	target := flag.String("target", output, "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
-	numWorkers := flag.Int("workers", 10, "The number of workers to process books")
+	numWorkers := flag.Int("workers", 20, "The number of workers to process books")
 	flag.Parse()
 
 	file, err := os.Create(*target)

@@ -2,7 +2,7 @@
 
 ### How to run
 
-    go run main.go -url <goodreads_book_url> -genre <genre_of_books> -depth <depth_to_search>
+    go run main.go -url <goodreads_book_url> -depth <depth_to_search> -workers <workers_to_get_books> -target <json_file_to_write>
 
 ### Output location
 
@@ -14,7 +14,7 @@
 
 ### How to run binary
 
-    ./goodreads -url <goodreads_book_url> -genre <genre_of_books> -depth <depth_to_search>
+    ./goodreads -url <goodreads_book_url> -depth <depth_to_search> -workers <workers_to_get_books> -target <json_file_to_write>
 
 ### Installing Go
 ##### For macOS

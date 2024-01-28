@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"goodreads/book"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -16,7 +17,8 @@ const (
 	goodreadsPrefix     = "https://www.goodreads.com"
 	similarPath         = "/book/similar/"
 	pragmaticProgrammer = goodreadsPrefix + "/book/show/4099.The_Pragmatic_Programmer"
-	output              = "output.json"
+	out                 = "output.json"
+	in                  = "input.json"
 )
 
 type processedBook struct {
@@ -26,18 +28,27 @@ type processedBook struct {
 }
 
 func main() {
-	rootUrl := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
-	target := flag.String("target", output, "Output location")
+	root := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
+	input := flag.String("input", in, "Input location")
+	output := flag.String("output", out, "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	numWorkers := flag.Int("workers", 20, "The number of workers to process books")
 	flag.Parse()
 
-	file, err := os.Create(*target)
+	file, err := os.Create(*output)
 	if err != nil {
 		panic(err)
 	}
 
-	books := arrangeBooks(findBooks(*rootUrl, *maxDepth, *numWorkers))
+	urlToBook, err := retrieveFile(*input)
+	if err != nil {
+		fmt.Printf("retrieve file failed: %s", *input)
+		urlToBook = make(map[string]*book.Book)
+	}
+
+	queue := createQueue(urlToBook, *root)
+	findBooks(queue, urlToBook, *maxDepth, *numWorkers)
+	books := arrangeBooks(urlToBook)
 
 	jsonData, err := json.Marshal(books)
 	if err != nil {
@@ -48,6 +59,91 @@ func main() {
 	if err != nil {
 		fmt.Println("writing to file: ", err)
 	}
+}
+
+func createQueue(urlToBook map[string]*book.Book, root string) []string {
+	bookIDs := make(chan string, len(urlToBook))
+	urls := make(chan string, len(urlToBook))
+	var wg sync.WaitGroup
+
+	for i := 0; i < 20; i++ {
+		go func(workerID int) {
+			for bookID := range bookIDs {
+				bookURLs, err := getBookURLs(bookID)
+				if err != nil {
+					formattedError := fmt.Errorf("error getting similar books %s: %w", bookID, err)
+					fmt.Println(formattedError)
+					continue
+				}
+
+				if bookURLs != nil {
+					fmt.Printf("Worker %d: %s\n", workerID, bookID)
+				}
+
+				for _, bookURL := range bookURLs {
+					urls <- bookURL
+				}
+
+				wg.Done()
+			}
+		}(i)
+	}
+
+	for _, b := range urlToBook {
+		cur := *b
+		wg.Add(1)
+		bookIDs <- cur.ID
+	}
+
+	close(bookIDs)
+
+	go func() {
+		wg.Wait()
+		close(urls)
+	}()
+
+	queue := []string{}
+
+	for url := range urls {
+		if _, ok := urlToBook[url]; !ok {
+			queue = append(queue, url)
+		}
+	}
+
+	if _, ok := urlToBook[root]; !ok {
+		queue = append(queue, root)
+	}
+
+	return queue
+}
+
+func retrieveFile(target string) (map[string]*book.Book, error) {
+	file, err := os.Open(target)
+	if err != nil {
+		return nil, fmt.Errorf("open file failed: %w", err)
+	}
+	defer file.Close()
+
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("read file failed: %w", err)
+	}
+
+	var books book.Books
+	err = json.Unmarshal(bytes, &books)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json failed: %w", err)
+
+	}
+
+	urlToBook := make(map[string]*book.Book)
+
+	for _, b := range books.Books {
+		cur := b
+		urlToBook[cur.URL] = &cur
+	}
+
+	return urlToBook, nil
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
@@ -66,10 +162,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	return book.Books{Books: arranged}
 }
 
-func findBooks(urlStr string, maxDepth, numWorkers int) map[string]*book.Book {
-	urlToBook := make(map[string]*book.Book)
-	queue := []string{urlStr}
-
+func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWorkers int) {
 	for i := 1; i <= maxDepth; i++ {
 		fmt.Println("depth: " + strconv.Itoa(i))
 		fmt.Println("books: " + strconv.Itoa(len(queue)))
@@ -81,8 +174,6 @@ func findBooks(urlStr string, maxDepth, numWorkers int) map[string]*book.Book {
 
 		queue = processQueue(isLast, numWorkers, queue, urlToBook)
 	}
-
-	return urlToBook
 }
 
 func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book) []string {
@@ -186,7 +277,7 @@ func processBook(isLast bool, url string) *processedBook {
 func meetsCriteria(curBook *book.Book) bool {
 	english := isEnglish(curBook.Title)
 	ratings := curBook.Ratings >= 500
-	rating := curBook.Rating >= 3.5
+	rating := curBook.Rating >= 4.0
 	return english && ratings && rating
 }
 

@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"goodreads/book"
 	"io"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"sync"
+
+	"github.com/dchooyc/book"
 )
 
 const (

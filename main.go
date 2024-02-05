@@ -41,13 +41,14 @@ func main() {
 		panic(err)
 	}
 
-	urlToBook, err := retrieveFile(*input)
+	retrieved, err := retrieveFile(*input)
 	if err != nil {
 		fmt.Printf("retrieve file failed: %s", *input)
-		urlToBook = make(map[string]*book.Book)
 	}
 
-	queue := createQueue(urlToBook, *root)
+	urlToBook := make(map[string]*book.Book)
+
+	queue := createQueue(retrieved, *root)
 	findBooks(queue, urlToBook, *maxDepth, *numWorkers)
 	books := arrangeBooks(urlToBook)
 
@@ -62,63 +63,28 @@ func main() {
 	}
 }
 
-func createQueue(urlToBook map[string]*book.Book, root string) []string {
-	bookIDs := make(chan string, len(urlToBook))
-	urls := make(chan string, len(urlToBook))
-	var wg sync.WaitGroup
-
-	for i := 0; i < 20; i++ {
-		go func(workerID int) {
-			for bookID := range bookIDs {
-				bookURLs, err := getBookURLs(bookID)
-				if err != nil {
-					formattedError := fmt.Errorf("error getting similar books %s: %w", bookID, err)
-					fmt.Println(formattedError)
-					continue
-				}
-
-				if bookURLs != nil {
-					fmt.Printf("Worker %d: %s\n", workerID, bookID)
-				}
-
-				for _, bookURL := range bookURLs {
-					urls <- bookURL
-				}
-
-				wg.Done()
-			}
-		}(i)
+func createQueue(retrieved *book.Books, root string) []string {
+	if retrieved == nil {
+		return []string{root}
 	}
 
-	for _, b := range urlToBook {
-		cur := *b
-		wg.Add(1)
-		bookIDs <- cur.ID
+	queue, seen := []string{}, make(map[string]bool)
+
+	for i := 0; i < len(retrieved.Books); i++ {
+		book := retrieved.Books[i]
+		url := book.URL
+		queue = append(queue, url)
+		seen[url] = true
 	}
 
-	close(bookIDs)
-
-	go func() {
-		wg.Wait()
-		close(urls)
-	}()
-
-	queue := []string{}
-
-	for url := range urls {
-		if _, ok := urlToBook[url]; !ok {
-			queue = append(queue, url)
-		}
-	}
-
-	if _, ok := urlToBook[root]; !ok {
+	if !seen[root] {
 		queue = append(queue, root)
 	}
 
 	return queue
 }
 
-func retrieveFile(target string) (map[string]*book.Book, error) {
+func retrieveFile(target string) (*book.Books, error) {
 	file, err := os.Open(target)
 	if err != nil {
 		return nil, fmt.Errorf("open file failed: %w", err)
@@ -137,14 +103,7 @@ func retrieveFile(target string) (map[string]*book.Book, error) {
 
 	}
 
-	urlToBook := make(map[string]*book.Book)
-
-	for _, b := range books.Books {
-		cur := b
-		urlToBook[cur.URL] = &cur
-	}
-
-	return urlToBook, nil
+	return &books, nil
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {

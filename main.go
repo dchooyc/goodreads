@@ -243,7 +243,7 @@ func meetsCriteria(curBook *book.Book) bool {
 
 func isEnglish(text string) bool {
 	for _, char := range text {
-		if char > 127 {
+		if char > 255 {
 			return false
 		}
 	}

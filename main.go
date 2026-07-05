@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"sync"
+	"time"
+
+	"goodreads/internal/crawl"
 
 	"github.com/dchooyc/book"
 )
@@ -22,18 +25,30 @@ const (
 	in                  = "input.json"
 )
 
+// processedBook separates the detail-page outcome from the similar-books
+// expansion outcome. A successful detail fetch must be saved even when the
+// expansion fails; only detailErr prevents saving the book.
 type processedBook struct {
 	book         *book.Book
-	err          error
+	detailErr    error
+	expansionErr error
 	similarBooks []string
+	attemptedURL string
 }
+
+type bookFetcher func(url string) (*book.Book, error)
+type similarFetcher func(id string) ([]string, error)
 
 func main() {
 	root := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
 	input := flag.String("input", in, "Input location")
 	output := flag.String("output", out, "Output location")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
-	numWorkers := flag.Int("workers", 20, "The number of workers to process books")
+	numWorkers := flag.Int("workers", 2, "The number of workers to process books")
+	delay := flag.Duration("delay", 2*time.Second, "Minimum delay between requests")
+	timeout := flag.Duration("timeout", 30*time.Second, "Per-request timeout")
+	maxRetries := flag.Int("max-retries", 3, "Max retries per URL")
+	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "User-Agent header")
 	flag.Parse()
 
 	file, err := os.Create(*output)
@@ -43,13 +58,17 @@ func main() {
 
 	retrieved, err := retrieveFile(*input)
 	if err != nil {
-		fmt.Printf("retrieve file failed: %s", *input)
+		fmt.Printf("retrieve file failed: %s\n", *input)
 	}
+
+	client := crawl.NewClient(*userAgent, *delay, *timeout, *maxRetries)
+	getBook := makeGetBook(client)
+	getBookURLs := makeGetBookURLs(client)
 
 	urlToBook := make(map[string]*book.Book)
 
 	queue := createQueue(retrieved, *root)
-	findBooks(queue, urlToBook, *maxDepth, *numWorkers)
+	findBooks(queue, urlToBook, *maxDepth, *numWorkers, getBook, getBookURLs)
 	books := arrangeBooks(urlToBook)
 
 	jsonData, err := json.Marshal(books)
@@ -122,7 +141,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	return book.Books{Books: arranged}
 }
 
-func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWorkers int) {
+func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWorkers int, getBook bookFetcher, getBookURLs similarFetcher) {
 	for i := 1; i <= maxDepth; i++ {
 		fmt.Println("depth: " + strconv.Itoa(i))
 		fmt.Println("books: " + strconv.Itoa(len(queue)))
@@ -132,16 +151,16 @@ func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWor
 			isLast = true
 		}
 
-		queue = processQueue(isLast, numWorkers, queue, urlToBook)
+		queue = processQueue(isLast, numWorkers, queue, urlToBook, getBook, getBookURLs)
 	}
 }
 
-func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book) []string {
+func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book, getBook bookFetcher, getBookURLs similarFetcher) []string {
 	urls := make(chan string, len(queue))
 	processedBooks := make(chan *processedBook, len(queue))
 	var wg sync.WaitGroup
 
-	createWorkers(min(len(queue), numWorkers), isLast, urls, processedBooks, &wg)
+	createWorkers(min(len(queue), numWorkers), isLast, urls, processedBooks, &wg, getBook, getBookURLs)
 
 	for _, url := range queue {
 		wg.Add(1)
@@ -158,12 +177,19 @@ func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[str
 	collect := make(map[string]bool)
 
 	for pBook := range processedBooks {
-		if pBook.err != nil {
-			fmt.Println(pBook.err)
+		if pBook.detailErr != nil {
+			fmt.Println("detail failed:", pBook.detailErr)
 			continue
 		}
 
-		urlToBook[pBook.book.URL] = pBook.book
+		// Expansion failure is reported but must not discard the book.
+		if pBook.expansionErr != nil {
+			fmt.Println("expansion failed (book kept):", pBook.expansionErr)
+		}
+
+		if pBook.book != nil {
+			urlToBook[pBook.book.URL] = pBook.book
+		}
 
 		for _, bookURL := range pBook.similarBooks {
 			collect[bookURL] = true
@@ -188,18 +214,15 @@ func min(a, b int) int {
 	return b
 }
 
-func createWorkers(numWorkers int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {
+func createWorkers(numWorkers int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup, getBook bookFetcher, getBookURLs similarFetcher) {
 	for w := 0; w < numWorkers; w++ {
-		go worker(w, isLast, urls, processedBooks, wg)
+		go worker(w, isLast, urls, processedBooks, wg, getBook, getBookURLs)
 	}
 }
 
-// give worker more details
-func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup) {
+func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<- *processedBook, wg *sync.WaitGroup, getBook bookFetcher, getBookURLs similarFetcher) {
 	for url := range urls {
-		pBook := processBook(isLast, url)
-		// do proper logging here
-		// add depth and count
+		pBook := processBook(isLast, url, getBook, getBookURLs)
 		if pBook.book != nil {
 			fmt.Printf("Worker %d: %s\n", workerID, pBook.book.Title)
 		}
@@ -208,12 +231,12 @@ func worker(workerID int, isLast bool, urls <-chan string, processedBooks chan<-
 	}
 }
 
-func processBook(isLast bool, url string) *processedBook {
-	res := &processedBook{}
+func processBook(isLast bool, url string, getBook bookFetcher, getBookURLs similarFetcher) *processedBook {
+	res := &processedBook{attemptedURL: url}
 
 	curBook, err := getBook(url)
 	if err != nil {
-		res.err = fmt.Errorf("error getting %s: %w", url, err)
+		res.detailErr = fmt.Errorf("error getting %s: %w", url, err)
 		return res
 	}
 
@@ -224,7 +247,7 @@ func processBook(isLast bool, url string) *processedBook {
 	if id != "" && !isLast && meetsCriteria(curBook) {
 		bookURLs, err := getBookURLs(id)
 		if err != nil {
-			res.err = fmt.Errorf("error getting similar books %s: %w", id, err)
+			res.expansionErr = fmt.Errorf("error getting similar books %s: %w", id, err)
 			return res
 		}
 
@@ -250,48 +273,49 @@ func isEnglish(text string) bool {
 	return true
 }
 
-func getBookURLs(id string) ([]string, error) {
-	path := goodreadsPrefix + similarPath + id
-	resp, err := http.Get(path)
-	if err != nil {
-		return nil, fmt.Errorf("http get failed: %w", err)
+func makeGetBookURLs(client crawl.Fetcher) similarFetcher {
+	return func(id string) ([]string, error) {
+		path := goodreadsPrefix + similarPath + id
+
+		body, _, err := client.Fetch(path)
+		if err != nil {
+			return nil, fmt.Errorf("fetch failed: %w", err)
+		}
+
+		urls, err := book.GetBookURLs(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("get book urls failed: %w", err)
+		}
+
+		fullURLs := make(map[string]bool)
+
+		for _, url := range urls {
+			fullURLs[goodreadsPrefix+url] = true
+		}
+
+		bookURLs, i := make([]string, len(fullURLs)), 0
+
+		for url := range fullURLs {
+			bookURLs[i] = url
+			i++
+		}
+
+		return bookURLs, nil
 	}
-
-	defer resp.Body.Close()
-
-	urls, err := book.GetBookURLs(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("get book urls failed: %w", err)
-	}
-
-	fullURLs := make(map[string]bool)
-
-	for _, url := range urls {
-		fullURLs[goodreadsPrefix+url] = true
-	}
-
-	bookURLs, i := make([]string, len(fullURLs)), 0
-
-	for url := range fullURLs {
-		bookURLs[i] = url
-		i++
-	}
-
-	return bookURLs, nil
 }
 
-func getBook(urlString string) (*book.Book, error) {
-	resp, err := http.Get(urlString)
-	if err != nil {
-		return nil, fmt.Errorf("http get failed: %w", err)
+func makeGetBook(client crawl.Fetcher) bookFetcher {
+	return func(urlString string) (*book.Book, error) {
+		body, _, err := client.Fetch(urlString)
+		if err != nil {
+			return nil, fmt.Errorf("fetch failed: %w", err)
+		}
+
+		curBook, err := book.GetBook(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("get book details failed: %w", err)
+		}
+
+		return curBook, nil
 	}
-
-	defer resp.Body.Close()
-
-	curBook, err := book.GetBook(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("get book details failed: %w", err)
-	}
-
-	return curBook, nil
 }

@@ -1,0 +1,48 @@
+{
+  "books": [
+    {
+      "title": "Divergent",
+      "url": "https://www.goodreads.com/book/show/13335037-divergent",
+      "id": "13155899",
+      "cover_url": "https://example.com/divergent.jpg",
+      "authors": ["Veronica Roth"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.13,
+      "ratings": 4299183,
+      "reviews": 126073
+    },
+    {
+      "title": "Divergent",
+      "url": "https://www.goodreads.com/book/show/13335037-divergent-alias",
+      "id": "13155899",
+      "cover_url": "",
+      "authors": ["Veronica Roth"],
+      "genres": ["young-adult"],
+      "rating": 4.13,
+      "ratings": 4299000,
+      "reviews": 126000
+    },
+    {
+      "title": "The Hunger Games",
+      "url": "https://www.goodreads.com/book/show/2767052-the-hunger-games",
+      "id": "2792775",
+      "cover_url": "https://example.com/hg.jpg",
+      "authors": ["Suzanne Collins"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.34,
+      "ratings": 9000000,
+      "reviews": 200000
+    },
+    {
+      "title": "Quiet Little Book",
+      "url": "https://www.goodreads.com/book/show/111-quiet-little-book",
+      "id": "111222",
+      "cover_url": "https://example.com/qlb.jpg",
+      "authors": ["Jane Doe"],
+      "genres": ["fiction"],
+      "rating": 4.2,
+      "ratings": 1200,
+      "reviews": 40
+    }
+  ]
+}

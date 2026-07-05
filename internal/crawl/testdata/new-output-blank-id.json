@@ -1,0 +1,26 @@
+{
+  "books": [
+    {
+      "title": "The Hunger Games",
+      "url": "https://www.goodreads.com/book/show/2767052-the-hunger-games",
+      "id": "2792775",
+      "cover_url": "https://example.com/hg.jpg",
+      "authors": ["Suzanne Collins"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.34,
+      "ratings": 9100000,
+      "reviews": 201000
+    },
+    {
+      "title": "Divergent",
+      "url": "https://www.goodreads.com/book/show/13335037-divergent",
+      "id": "",
+      "cover_url": "https://example.com/divergent.jpg",
+      "authors": ["Veronica Roth"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.13,
+      "ratings": 4456320,
+      "reviews": 127000
+    }
+  ]
+}

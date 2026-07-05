@@ -1,0 +1,26 @@
+{
+  "books": [
+    {
+      "title": "The Hunger Games",
+      "url": "https://www.goodreads.com/book/show/2767052-the-hunger-games",
+      "id": "2792775",
+      "cover_url": "https://example.com/hg.jpg",
+      "authors": ["Suzanne Collins"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.34,
+      "ratings": 9100000,
+      "reviews": 201000
+    },
+    {
+      "title": "Brand New Book",
+      "url": "https://www.goodreads.com/book/show/999-brand-new-book",
+      "id": "999888",
+      "cover_url": "https://example.com/bnb.jpg",
+      "authors": ["New Author"],
+      "genres": ["fiction"],
+      "rating": 4.5,
+      "ratings": 50000,
+      "reviews": 3000
+    }
+  ]
+}

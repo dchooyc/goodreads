@@ -26,7 +26,7 @@ func main() {
 	statePath := flag.String("state", "recovery-state.json", "checkpoint state file")
 	priority := flag.String("priority", "all", "priority filter: all, P0, P1, P2, P3")
 	limit := flag.Int("limit", 0, "optional dry batch size (0 = no limit)")
-	workers := flag.Int("workers", 1, "workers (requests are globally rate-limited; kept for compatibility)")
+	workers := flag.Int("workers", 1, "concurrent workers (request rate stays capped by -delay)")
 	delay := flag.Duration("delay", 3*time.Second, "minimum delay between requests")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	maxRetries := flag.Int("max-retries", 3, "max retries per URL")
@@ -34,10 +34,6 @@ func main() {
 	keepPrevious := flag.Bool("keep-previous-on-fail", false, "fall back to the previous snapshot row when the page cannot be fetched")
 	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "identifying User-Agent header")
 	flag.Parse()
-
-	if *workers > 1 {
-		fmt.Println("note: requests are globally rate-limited by the polite client; running sequentially")
-	}
 
 	var targetsFile crawl.MissingTargetsFile
 	if err := crawl.ReadJSONFile(*targetsPath, &targetsFile); err != nil {
@@ -84,9 +80,15 @@ func main() {
 		MeetsCriteria:      meetsCriteria,
 		KeepPreviousOnFail: *keepPrevious,
 		Force:              *force,
+		Workers:            *workers,
 		OnResult: func(r crawl.TargetResult) {
+			// Called serialized by the runner. The state file is already
+			// checkpointed per target; rewrite the (larger) output files
+			// every 20 targets to keep overhead low.
 			currentResults = append(currentResults, r)
-			writeOutputs()
+			if len(currentResults)%20 == 0 {
+				writeOutputs()
+			}
 		},
 	})
 	if err != nil {

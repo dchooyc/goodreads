@@ -3,6 +3,7 @@ package crawl
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dchooyc/book"
@@ -17,16 +18,20 @@ type RecoveryConfig struct {
 	MeetsCriteria      func(b *book.Book) bool
 	KeepPreviousOnFail bool
 	Force              bool
-	Now                func() time.Time
-	Logf               func(format string, args ...interface{})
-	// OnResult is called after every target so callers can checkpoint the
-	// output file incrementally.
+	// Workers is the number of concurrent target processors. Throughput is
+	// still capped by the shared client's global rate limit; extra workers
+	// only overlap request latency.
+	Workers int
+	Now     func() time.Time
+	Logf    func(format string, args ...interface{})
+	// OnResult is called after every target (serialized) so callers can
+	// checkpoint the output file incrementally.
 	OnResult func(TargetResult)
 }
 
-// Runner executes the targeted recovery algorithm, one target at a time.
-// Requests are already globally rate-limited by the polite client, so the
-// runner is deliberately sequential: gentle, auditable, resumable.
+// Runner executes the targeted recovery algorithm with a bounded worker
+// pool. Requests stay globally rate-limited by the shared polite client, so
+// concurrency overlaps latency without raising the request rate.
 type Runner struct {
 	cfg RecoveryConfig
 }
@@ -48,42 +53,92 @@ func NewRunner(cfg RecoveryConfig) (*Runner, error) {
 	return &Runner{cfg: cfg}, nil
 }
 
-// Run processes targets in order. Targets already completed in the state file
-// are skipped unless Force is set. Returns the results of this run (skipped
-// targets are not re-emitted). A hard block (ErrBlocked) stops the run and is
-// returned after in-flight bookkeeping completes.
+// Run processes targets with the configured worker pool. Targets already
+// completed in the state file are skipped unless Force is set. Returns the
+// results of this run (skipped targets are not re-emitted). A hard block
+// (ErrBlocked) stops dispatching new targets; in-flight targets finish and
+// are checkpointed before the error is returned.
 func (r *Runner) Run(targets []RecoveryTarget) ([]TargetResult, error) {
-	results := make([]TargetResult, 0, len(targets))
-
-	for i, target := range targets {
-		id := target.ExpectedGoodreadsWorkID
-		if !r.cfg.Force && r.cfg.State.IsDone(id) {
-			ts, _ := r.cfg.State.Get(id)
-			r.cfg.Logf("[%d/%d] skip %s (%s): already %s", i+1, len(targets), id, target.Title, ts.Status)
+	pending := make([]RecoveryTarget, 0, len(targets))
+	skipped := 0
+	for _, target := range targets {
+		if !r.cfg.Force && r.cfg.State.IsDone(target.ExpectedGoodreadsWorkID) {
+			skipped++
 			continue
 		}
-
-		r.cfg.Logf("[%d/%d] %s %s (%s)", i+1, len(targets), target.Priority, id, target.Title)
-		result := r.processTarget(target)
-		results = append(results, result)
-
-		lastErr := ""
-		if len(result.Errors) > 0 {
-			lastErr = result.Errors[len(result.Errors)-1]
-		}
-		if err := r.cfg.State.Update(id, result.Status, result.AttemptedURLs, lastErr); err != nil {
-			return results, fmt.Errorf("checkpoint after %s: %w", id, err)
-		}
-		if r.cfg.OnResult != nil {
-			r.cfg.OnResult(result)
-		}
-
-		if result.Status == StatusBlocked {
-			return results, ErrBlocked
-		}
+		pending = append(pending, target)
+	}
+	if skipped > 0 {
+		r.cfg.Logf("skipping %d targets already completed in state file", skipped)
 	}
 
-	return results, nil
+	workers := r.cfg.Workers
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(pending) {
+		workers = len(pending)
+	}
+
+	var (
+		mu      sync.Mutex
+		results = make([]TargetResult, 0, len(pending))
+		runErr  error
+		done    int
+	)
+	jobs := make(chan RecoveryTarget)
+	stop := make(chan struct{})
+	var stopOnce sync.Once
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for target := range jobs {
+				result := r.processTarget(target)
+
+				lastErr := ""
+				if len(result.Errors) > 0 {
+					lastErr = result.Errors[len(result.Errors)-1]
+				}
+
+				mu.Lock()
+				results = append(results, result)
+				done++
+				r.cfg.Logf("[%d/%d] %s %s (%s) -> %s", done, len(pending),
+					result.Priority, result.ExpectedGoodreadsWorkID, result.Title, result.Status)
+				if err := r.cfg.State.Update(result.ExpectedGoodreadsWorkID, result.Status,
+					result.AttemptedURLs, lastErr); err != nil && runErr == nil {
+					runErr = fmt.Errorf("checkpoint after %s: %w", result.ExpectedGoodreadsWorkID, err)
+				}
+				if r.cfg.OnResult != nil {
+					r.cfg.OnResult(result)
+				}
+				if result.Status == StatusBlocked && runErr == nil {
+					runErr = ErrBlocked
+				}
+				mu.Unlock()
+
+				if result.Status == StatusBlocked {
+					stopOnce.Do(func() { close(stop) })
+				}
+			}
+		}()
+	}
+
+dispatch:
+	for _, target := range pending {
+		select {
+		case <-stop:
+			break dispatch
+		case jobs <- target:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	return results, runErr
 }
 
 func (r *Runner) processTarget(target RecoveryTarget) TargetResult {

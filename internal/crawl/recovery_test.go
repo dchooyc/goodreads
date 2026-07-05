@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 // fakeFetcher maps URL -> canned response.
 type fakeFetcher struct {
+	mu        sync.Mutex
 	responses map[string]fakeResponse
 	calls     []string
 }
@@ -23,7 +25,9 @@ type fakeResponse struct {
 }
 
 func (f *fakeFetcher) Fetch(url string) ([]byte, int, error) {
+	f.mu.Lock()
 	f.calls = append(f.calls, url)
+	f.mu.Unlock()
 	r, ok := f.responses[url]
 	if !ok {
 		return nil, 0, fmt.Errorf("fetch %s: connection refused", url)
@@ -254,6 +258,57 @@ func TestRecoverBlockedStopsRun(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].Status != StatusBlocked {
 		t.Fatalf("first target should be marked blocked and run stopped, got %+v", results)
+	}
+}
+
+func TestRecoverConcurrentWorkers(t *testing.T) {
+	const n = 40
+	targets := make([]RecoveryTarget, 0, n)
+	responses := map[string]fakeResponse{}
+	books := map[string]book.Book{}
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("id-%d", i)
+		url := fmt.Sprintf("https://example.com/book-%d", i)
+		body := fmt.Sprintf("page-%d", i)
+		targets = append(targets, RecoveryTarget{
+			Priority:                "P0",
+			ExpectedGoodreadsWorkID: id,
+			Title:                   fmt.Sprintf("Book %d", i),
+			Authors:                 []string{"Author"},
+			PrimaryOldURL:           url,
+		})
+		responses[url] = fakeResponse{body: body, status: 200}
+		books[body] = book.Book{ID: id, Title: fmt.Sprintf("Book %d", i), Authors: []string{"Author"}, Rating: 4.5, Ratings: 1000}
+	}
+
+	state, err := LoadState(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var onResultCalls int
+	runner, err := NewRunner(RecoveryConfig{
+		Fetcher:   &fakeFetcher{responses: responses},
+		State:     state,
+		ParseBook: fakeParser(books),
+		Workers:   8,
+		Logf:      func(string, ...interface{}) {},
+		OnResult:  func(TargetResult) { onResultCalls++ }, // serialized by the runner
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := runner.Run(targets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != n || onResultCalls != n {
+		t.Fatalf("want %d results and callbacks, got %d and %d", n, len(results), onResultCalls)
+	}
+	for i := 0; i < n; i++ {
+		if !state.IsDone(fmt.Sprintf("id-%d", i)) {
+			t.Fatalf("target id-%d not checkpointed", i)
+		}
 	}
 }
 

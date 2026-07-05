@@ -70,7 +70,7 @@ func NewClient(userAgent string, minDelay, timeout time.Duration, maxRetries int
 		HTTPClient:          &http.Client{Timeout: timeout},
 		UserAgent:           userAgent,
 		MinDelay:            minDelay,
-		Jitter:              minDelay / 2,
+		Jitter:              minDelay / 4,
 		MaxRetries:          maxRetries,
 		BackoffBase:         10 * time.Second,
 		BackoffMax:          5 * time.Minute,
@@ -151,8 +151,9 @@ func retryAfterDelay(resp *http.Response, fallback time.Duration) time.Duration 
 	return fallback
 }
 
+// backoff grows linearly: base, 2*base, 3*base (10s, 20s, 30s by default).
 func (c *Client) backoff(attempt int) time.Duration {
-	d := c.BackoffBase << uint(attempt)
+	d := c.BackoffBase * time.Duration(attempt+1)
 	if c.BackoffMax > 0 && d > c.BackoffMax {
 		d = c.BackoffMax
 	}

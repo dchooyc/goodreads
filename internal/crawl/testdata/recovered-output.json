@@ -1,0 +1,62 @@
+{
+  "summary": {
+    "targets_read": 2,
+    "recovered": 1,
+    "kept_from_previous_snapshot": 1,
+    "still_missing": 0,
+    "needs_manual_review": 0,
+    "failed": 0
+  },
+  "books": [
+    {
+      "title": "Divergent",
+      "url": "https://www.goodreads.com/book/show/13335037-divergent",
+      "id": "13155899",
+      "cover_url": "https://example.com/divergent.jpg",
+      "authors": ["Veronica Roth"],
+      "genres": ["young-adult", "dystopia"],
+      "rating": 4.13,
+      "ratings": 4456320,
+      "reviews": 127000
+    },
+    {
+      "title": "Quiet Little Book",
+      "url": "https://www.goodreads.com/book/show/111-quiet-little-book",
+      "id": "111222",
+      "cover_url": "https://example.com/qlb.jpg",
+      "authors": ["Jane Doe"],
+      "genres": ["fiction"],
+      "rating": 4.2,
+      "ratings": 1200,
+      "reviews": 40
+    }
+  ],
+  "target_results": [
+    {
+      "expected_goodreads_work_id": "13155899",
+      "title": "Divergent",
+      "authors": ["Veronica Roth"],
+      "priority": "P0",
+      "attempted_urls": ["https://www.goodreads.com/book/show/13335037-divergent"],
+      "status": "recovered",
+      "selected_source": "fetched_current_page",
+      "errors": [],
+      "warnings": [],
+      "started_at": "2026-07-06T00:00:00Z",
+      "finished_at": "2026-07-06T00:00:05Z"
+    },
+    {
+      "expected_goodreads_work_id": "111222",
+      "title": "Quiet Little Book",
+      "authors": ["Jane Doe"],
+      "priority": "P3",
+      "attempted_urls": ["https://www.goodreads.com/book/show/111-quiet-little-book"],
+      "status": "kept_from_previous_snapshot",
+      "selected_source": "previous_snapshot_fallback",
+      "errors": ["fetch failed"],
+      "warnings": ["page fetch/parse failed; kept previous snapshot row so the dataset does not lose the book"],
+      "started_at": "2026-07-06T00:00:10Z",
+      "finished_at": "2026-07-06T00:00:15Z"
+    }
+  ]
+}

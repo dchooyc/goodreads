@@ -82,13 +82,13 @@ func main() {
 		Force:              *force,
 		Workers:            *workers,
 		OnResult: func(r crawl.TargetResult) {
-			// Called serialized by the runner. The state file is already
-			// checkpointed per target; rewrite the (larger) output files
-			// every 20 targets to keep overhead low.
+			// Called serialized by the runner. Flush the output every target:
+			// state is checkpointed per target, and if the two diverge (e.g.
+			// the process is killed between flushes) a resume skips the
+			// already-"done" target, permanently dropping its book data from
+			// the output file. Keeping them in lockstep prevents that.
 			currentResults = append(currentResults, r)
-			if len(currentResults)%20 == 0 {
-				writeOutputs()
-			}
+			writeOutputs()
 		},
 	})
 	if err != nil {

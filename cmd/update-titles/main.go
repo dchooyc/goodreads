@@ -54,8 +54,8 @@ func main() {
 
 	stats := struct{ updated, warned, failed, processed int }{}
 	blocked := false
-	// A book filed under many genres appears in many chunks; the cache makes
-	// sure each unique URL is fetched only once per run.
+	// The cache makes sure each unique URL is fetched only once per run,
+	// even if a book appears in more than one chunk (e.g. legacy layouts).
 	cache := map[string]book.Book{}
 
 	for _, chunkPath := range chunks {

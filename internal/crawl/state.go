@@ -66,7 +66,7 @@ func (s *State) IsDone(workID string) bool {
 		return false
 	}
 	switch ts.Status {
-	case StatusRecovered, StatusKeptFromPrevious, StatusBelowThreshold, StatusManualReview, StatusParseFailed:
+	case StatusRecovered, StatusKeptFromPrevious, StatusBelowThreshold, StatusManualReview, StatusParseFailed, StatusUpdated:
 		return true
 	}
 	return false

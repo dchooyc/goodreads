@@ -74,6 +74,7 @@ const (
 	StatusHTTPFailed       = "http_failed"
 	StatusBlocked          = "blocked"
 	StatusManualReview     = "needs_manual_review"
+	StatusUpdated          = "updated"
 )
 
 // Selected sources.

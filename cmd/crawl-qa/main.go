@@ -16,8 +16,6 @@ func main() {
 	oldPath := flag.String("old", "output.json", "previous accepted output")
 	newPath := flag.String("new", "output.merged.json", "candidate output to accept")
 	recoveredPath := flag.String("recovered", "", "optional recovery result file (counts as recovery decisions)")
-	jsonOut := flag.String("out-json", "crawl-quality-report.json", "JSON report path")
-	mdOut := flag.String("out-md", "crawl-quality-report.md", "Markdown report path")
 	flag.Parse()
 
 	oldBooks, err := crawl.ReadBooksFile(*oldPath)
@@ -40,17 +38,10 @@ func main() {
 
 	report := crawl.RunQA(oldBooks.Books, newBooks.Books, recovery)
 
-	if err := crawl.WriteJSONFileAtomic(*jsonOut, report); err != nil {
-		fail(err)
-	}
-	if err := os.WriteFile(*mdOut, []byte(crawl.RenderQAMarkdown(report)), 0o644); err != nil {
-		fail(err)
-	}
-
 	m := report.Metrics
 	fmt.Printf("raw rows: %d, canonical: %d, blank-ID rate: %.2f%%\n", m.RawRows, m.CanonicalNonblankIDs, m.BlankIDRate*100)
 	fmt.Printf("old IDs missing from new: %d (P0: %d, undecided P0: %d)\n", m.OldIDsMissingFromNew, m.P0MissingCount, m.P0MissingUndecided)
-	fmt.Printf("wrote %s and %s\n", *jsonOut, *mdOut)
+	fmt.Printf("blank titles: %d, top-1000 disappeared: %d\n", m.BlankTitleRows, m.Top1000Disappeared)
 
 	if !report.Passed {
 		fmt.Fprintln(os.Stderr, "crawl-qa: FAILED")

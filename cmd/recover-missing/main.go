@@ -22,7 +22,6 @@ import (
 func main() {
 	targetsPath := flag.String("targets", "topreads-missing-books-to-double-check.json", "missing-target input file")
 	outPath := flag.String("out", "recovered-missing-books.json", "recovery result output file")
-	reportPath := flag.String("report", "recovery-report.md", "markdown report output file")
 	statePath := flag.String("state", "recovery-state.json", "checkpoint state file")
 	priority := flag.String("priority", "all", "priority filter: all, P0, P1, P2, P3")
 	limit := flag.Int("limit", 0, "optional dry batch size (0 = no limit)")
@@ -67,9 +66,6 @@ func main() {
 		if err := crawl.WriteJSONFileAtomic(*outPath, out); err != nil {
 			fmt.Println("warning: writing output failed:", err)
 		}
-		if err := os.WriteFile(*reportPath, []byte(crawl.RenderRecoveryMarkdown(out)), 0o644); err != nil {
-			fmt.Println("warning: writing report failed:", err)
-		}
 		return out
 	}
 
@@ -101,7 +97,7 @@ func main() {
 	fmt.Printf("\nsummary: recovered=%d kept=%d manual_review=%d failed=%d still_missing=%d\n",
 		out.Summary.Recovered, out.Summary.KeptFromPreviousSnapshot,
 		out.Summary.NeedsManualReview, out.Summary.Failed, out.Summary.StillMissing)
-	fmt.Printf("wrote %s, %s, state in %s\n", *outPath, *reportPath, *statePath)
+	fmt.Printf("wrote %s, state in %s\n", *outPath, *statePath)
 
 	if runErr != nil {
 		if errors.Is(runErr, crawl.ErrBlocked) {

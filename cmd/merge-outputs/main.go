@@ -16,7 +16,6 @@ func main() {
 	newPath := flag.String("new", "output.json", "new crawler output")
 	recoveredPath := flag.String("recovered", "recovered-missing-books.json", "recovery result file")
 	outPath := flag.String("out", "output.merged.json", "merged output file")
-	reportPath := flag.String("report", "merge-report.json", "merge report file")
 	flag.Parse()
 
 	newBooks, err := crawl.ReadBooksFile(*newPath)
@@ -43,9 +42,6 @@ func main() {
 	if err := crawl.WriteJSONFileAtomic(*outPath, merged); err != nil {
 		fail(err)
 	}
-	if err := crawl.WriteJSONFileAtomic(*reportPath, report); err != nil {
-		fail(err)
-	}
 
 	s := report.Summary
 	fmt.Printf("new canonical:        %d\n", s.NewCanonicalBooks)
@@ -54,7 +50,7 @@ func main() {
 	fmt.Printf("replaced by recovery: %d\n", s.ReplacedByRecovered)
 	fmt.Printf("blank-ID quarantined: %d of %d\n", s.BlankIDRowsQuarantined, s.BlankIDRowsInNew)
 	fmt.Printf("final books:          %d\n", s.FinalBooks)
-	fmt.Printf("wrote %s and %s\n", *outPath, *reportPath)
+	fmt.Printf("wrote %s\n", *outPath)
 }
 
 func fail(err error) {

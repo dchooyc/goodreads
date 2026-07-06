@@ -35,7 +35,7 @@ func TestDetailSuccessExpansionFailureStillSavesBook(t *testing.T) {
 	urlToBook := make(map[string]*book.Book)
 	queue := []string{"https://www.goodreads.com/book/show/13335037-divergent"}
 
-	processQueue(false, 1, queue, urlToBook, getBook, getBookURLs)
+	processQueue(false, 1, queue, urlToBook, getBook, getBookURLs, 0, nil)
 
 	saved, ok := urlToBook["https://www.goodreads.com/book/show/13335037-divergent"]
 	if !ok || saved == nil {
@@ -53,7 +53,7 @@ func TestDetailFailureDoesNotSaveBook(t *testing.T) {
 	urlToBook := make(map[string]*book.Book)
 	queue := []string{"https://www.goodreads.com/book/show/13335037-divergent"}
 
-	processQueue(false, 1, queue, urlToBook, getBook, getBookURLs)
+	processQueue(false, 1, queue, urlToBook, getBook, getBookURLs, 0, nil)
 
 	if len(urlToBook) != 0 {
 		t.Fatalf("no book should be saved on detail failure, got %d", len(urlToBook))
@@ -79,6 +79,21 @@ func TestProcessBookSeparatesOutcomes(t *testing.T) {
 	p = processBook(false, "https://example.com/book", getBook, okExpansion)
 	if p.expansionErr != nil || len(p.similarBooks) != 1 {
 		t.Fatalf("expansion should succeed: %+v", p)
+	}
+}
+
+func TestProcessQueueFlushesProgress(t *testing.T) {
+	getBook := fakeGetBook(goodBook(), nil)
+	getBookURLs := func(id string) ([]string, error) { return nil, nil }
+
+	urlToBook := make(map[string]*book.Book)
+	queue := []string{"https://example.com/a", "https://example.com/b", "https://example.com/c"}
+
+	flushes := 0
+	processQueue(false, 1, queue, urlToBook, getBook, getBookURLs, 1, func() { flushes++ })
+
+	if flushes != 3 {
+		t.Fatalf("want a flush per saved book (flushEvery=1), got %d", flushes)
 	}
 }
 

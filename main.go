@@ -2,11 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"os"
 	"sort"
 	"strconv"
 	"sync"
@@ -21,7 +18,7 @@ const (
 	goodreadsPrefix     = "https://www.goodreads.com"
 	similarPath         = "/book/similar/"
 	pragmaticProgrammer = goodreadsPrefix + "/book/show/4099.The_Pragmatic_Programmer"
-	out                 = "output.json"
+	out                 = "output"
 	in                  = "input.json"
 )
 
@@ -41,20 +38,16 @@ type similarFetcher func(id string) ([]string, error)
 
 func main() {
 	root := flag.String("url", pragmaticProgrammer, "The url to begin crawling from")
-	input := flag.String("input", in, "Input location")
-	output := flag.String("output", out, "Output location")
+	input := flag.String("input", in, "Input location (file or output folder)")
+	output := flag.String("output", out, "Output location (folder, or a .json file)")
 	maxDepth := flag.Int("depth", 2, "The depth at which to stop crawling")
 	numWorkers := flag.Int("workers", 2, "The number of workers to process books")
 	delay := flag.Duration("delay", 2*time.Second, "Minimum delay between requests")
 	timeout := flag.Duration("timeout", 30*time.Second, "Per-request timeout")
 	maxRetries := flag.Int("max-retries", 3, "Max retries per URL")
+	flushEvery := flag.Int("flush-every", 100, "checkpoint the output after this many new books (0 = only at the end)")
 	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "User-Agent header")
 	flag.Parse()
-
-	file, err := os.Create(*output)
-	if err != nil {
-		panic(err)
-	}
 
 	retrieved, err := retrieveFile(*input)
 	if err != nil {
@@ -67,19 +60,18 @@ func main() {
 
 	urlToBook := make(map[string]*book.Book)
 
+	// flush checkpoints everything collected so far; a crash or kill loses at
+	// most the books gathered since the previous flush.
+	flush := func() {
+		if err := crawl.WriteBooks(*output, arrangeBooks(urlToBook), crawl.DefaultChunkSize); err != nil {
+			fmt.Println("checkpoint write failed:", err)
+		}
+	}
+
 	queue := createQueue(retrieved, *root)
-	findBooks(queue, urlToBook, *maxDepth, *numWorkers, getBook, getBookURLs)
-	books := arrangeBooks(urlToBook)
-
-	jsonData, err := json.Marshal(books)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = file.Write(jsonData)
-	if err != nil {
-		fmt.Println("writing to file: ", err)
-	}
+	findBooks(queue, urlToBook, *maxDepth, *numWorkers, getBook, getBookURLs, *flushEvery, flush)
+	flush()
+	fmt.Printf("wrote %d books to %s\n", len(arrangeBooks(urlToBook).Books), *output)
 }
 
 func createQueue(retrieved *book.Books, root string) []string {
@@ -104,25 +96,7 @@ func createQueue(retrieved *book.Books, root string) []string {
 }
 
 func retrieveFile(target string) (*book.Books, error) {
-	file, err := os.Open(target)
-	if err != nil {
-		return nil, fmt.Errorf("open file failed: %w", err)
-	}
-	defer file.Close()
-
-	bytes, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("read file failed: %w", err)
-	}
-
-	var books book.Books
-	err = json.Unmarshal(bytes, &books)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal json failed: %w", err)
-
-	}
-
-	return &books, nil
+	return crawl.ReadBooks(target)
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
@@ -141,7 +115,7 @@ func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
 	return book.Books{Books: arranged}
 }
 
-func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWorkers int, getBook bookFetcher, getBookURLs similarFetcher) {
+func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWorkers int, getBook bookFetcher, getBookURLs similarFetcher, flushEvery int, flush func()) {
 	for i := 1; i <= maxDepth; i++ {
 		fmt.Println("depth: " + strconv.Itoa(i))
 		fmt.Println("books: " + strconv.Itoa(len(queue)))
@@ -151,11 +125,14 @@ func findBooks(queue []string, urlToBook map[string]*book.Book, maxDepth, numWor
 			isLast = true
 		}
 
-		queue = processQueue(isLast, numWorkers, queue, urlToBook, getBook, getBookURLs)
+		queue = processQueue(isLast, numWorkers, queue, urlToBook, getBook, getBookURLs, flushEvery, flush)
+		if flush != nil {
+			flush()
+		}
 	}
 }
 
-func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book, getBook bookFetcher, getBookURLs similarFetcher) []string {
+func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[string]*book.Book, getBook bookFetcher, getBookURLs similarFetcher, flushEvery int, flush func()) []string {
 	urls := make(chan string, len(queue))
 	processedBooks := make(chan *processedBook, len(queue))
 	var wg sync.WaitGroup
@@ -175,6 +152,7 @@ func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[str
 	}()
 
 	collect := make(map[string]bool)
+	saved := 0
 
 	for pBook := range processedBooks {
 		if pBook.detailErr != nil {
@@ -189,6 +167,10 @@ func processQueue(isLast bool, numWorkers int, queue []string, urlToBook map[str
 
 		if pBook.book != nil {
 			urlToBook[pBook.book.URL] = pBook.book
+			saved++
+			if flush != nil && flushEvery > 0 && saved%flushEvery == 0 {
+				flush()
+			}
 		}
 
 		for _, bookURL := range pBook.similarBooks {

@@ -20,11 +20,11 @@ func main() {
 	generatedAt := flag.String("generated-at", time.Now().UTC().Format("2006-01-02"), "generated_at stamp (fix for reproducible output)")
 	flag.Parse()
 
-	oldBooks, err := crawl.ReadBooksFile(*oldPath)
+	oldBooks, err := crawl.ReadBooks(*oldPath)
 	if err != nil {
 		fail(err)
 	}
-	newBooks, err := crawl.ReadBooksFile(*newPath)
+	newBooks, err := crawl.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}

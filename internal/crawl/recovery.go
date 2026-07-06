@@ -96,6 +96,14 @@ func (r *Runner) Run(targets []RecoveryTarget) ([]TargetResult, error) {
 		go func() {
 			defer wg.Done()
 			for target := range jobs {
+				// A target already handed over when the hard stop fired is
+				// drained without processing.
+				select {
+				case <-stop:
+					continue
+				default:
+				}
+
 				result := r.processTarget(target)
 
 				lastErr := ""

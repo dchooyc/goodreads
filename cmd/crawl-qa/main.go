@@ -14,15 +14,15 @@ import (
 
 func main() {
 	oldPath := flag.String("old", "output.json", "previous accepted output")
-	newPath := flag.String("new", "output.merged.json", "candidate output to accept")
+	newPath := flag.String("new", "output", "candidate output file or folder to accept")
 	recoveredPath := flag.String("recovered", "", "optional recovery result file (counts as recovery decisions)")
 	flag.Parse()
 
-	oldBooks, err := crawl.ReadBooksFile(*oldPath)
+	oldBooks, err := crawl.ReadBooks(*oldPath)
 	if err != nil {
 		fail(err)
 	}
-	newBooks, err := crawl.ReadBooksFile(*newPath)
+	newBooks, err := crawl.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}

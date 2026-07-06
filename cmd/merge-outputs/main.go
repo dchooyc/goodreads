@@ -15,10 +15,10 @@ func main() {
 	oldPath := flag.String("old", "", "previous crawler output (optional, stats only)")
 	newPath := flag.String("new", "output.json", "new crawler output")
 	recoveredPath := flag.String("recovered", "recovered-missing-books.json", "recovery result file")
-	outPath := flag.String("out", "output.merged.json", "merged output file")
+	outPath := flag.String("out", "output", "merged output file or folder")
 	flag.Parse()
 
-	newBooks, err := crawl.ReadBooksFile(*newPath)
+	newBooks, err := crawl.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}
@@ -31,7 +31,7 @@ func main() {
 	merged, report := crawl.MergeOutputs(newBooks.Books, recovered)
 
 	if *oldPath != "" {
-		if oldBooks, err := crawl.ReadBooksFile(*oldPath); err == nil {
+		if oldBooks, err := crawl.ReadBooks(*oldPath); err == nil {
 			oldCanonical, _ := crawl.CanonicalizeBooks(oldBooks.Books)
 			fmt.Printf("old canonical books: %d\n", len(oldCanonical))
 		} else {
@@ -39,7 +39,7 @@ func main() {
 		}
 	}
 
-	if err := crawl.WriteJSONFileAtomic(*outPath, merged); err != nil {
+	if err := crawl.WriteBooks(*outPath, merged, 0); err != nil {
 		fail(err)
 	}
 

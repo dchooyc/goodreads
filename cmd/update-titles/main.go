@@ -51,9 +51,15 @@ func main() {
 
 	stats := struct{ updated, warned, failed, processed int }{}
 	blocked := false
+	// A book filed under many genres appears in many chunks; the cache makes
+	// sure each unique URL is fetched only once per run.
+	cache := map[string]book.Book{}
 
 	for _, chunkPath := range chunks {
-		chunkKey := filepath.Base(chunkPath)
+		chunkKey, err := filepath.Rel(*outputDir, chunkPath)
+		if err != nil {
+			chunkKey = chunkPath
+		}
 		if !*force && state.IsDone(chunkKey) {
 			continue
 		}
@@ -72,7 +78,7 @@ func main() {
 		}
 
 		fmt.Printf("chunk %s: refreshing %d of %d books\n", chunkKey, todo, len(books.Books))
-		completed := updateChunk(client, books, todo, *workers, *flushEvery, chunkPath, &stats, &blocked)
+		completed := updateChunk(client, books, todo, *workers, *flushEvery, chunkPath, &stats, &blocked, cache)
 
 		if completed && todo == len(books.Books) {
 			if err := state.Update(chunkKey, crawl.StatusUpdated, nil, ""); err != nil {
@@ -110,7 +116,8 @@ func main() {
 // updateChunk refreshes the first todo books of a chunk in place, flushing
 // the chunk file periodically. Returns false when the run was hard-stopped.
 func updateChunk(client *crawl.Client, books *book.Books, todo, workers, flushEvery int,
-	chunkPath string, stats *struct{ updated, warned, failed, processed int }, blocked *bool) bool {
+	chunkPath string, stats *struct{ updated, warned, failed, processed int }, blocked *bool,
+	cache map[string]book.Book) bool {
 
 	var mu sync.Mutex
 	flush := func() {
@@ -142,10 +149,24 @@ func updateChunk(client *crawl.Client, books *book.Books, todo, workers, flushEv
 				}
 
 				old := books.Books[i]
+
+				mu.Lock()
+				cached, hit := cache[old.URL]
+				mu.Unlock()
+				if hit {
+					mu.Lock()
+					books.Books[i] = cached
+					mu.Unlock()
+					continue
+				}
+
 				refreshed, warn := fetchAndRefresh(client, old, blocked, &mu)
 
 				mu.Lock()
 				books.Books[i] = refreshed
+				if warn == "" && old.URL != "" {
+					cache[old.URL] = refreshed
+				}
 				stats.processed++
 				if warn == "" {
 					stats.updated++

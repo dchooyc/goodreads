@@ -1,4 +1,4 @@
-package crawl
+package recovery
 
 import (
 	"errors"
@@ -6,14 +6,19 @@ import (
 	"sync"
 	"time"
 
+	"goodreads/internal/fetch"
+	"goodreads/internal/identity"
+	"goodreads/internal/model"
+	"goodreads/internal/store"
+
 	"github.com/dchooyc/book"
 )
 
 // RecoveryConfig wires the recovery runner. Fetcher, ParseBook, MeetsCriteria
 // and Now are injectable for tests.
 type RecoveryConfig struct {
-	Fetcher            Fetcher
-	State              *State
+	Fetcher            fetch.Fetcher
+	State              *store.State
 	ParseBook          func(body []byte) (*book.Book, error)
 	MeetsCriteria      func(b *book.Book) bool
 	KeepPreviousOnFail bool
@@ -26,7 +31,7 @@ type RecoveryConfig struct {
 	Logf    func(format string, args ...interface{})
 	// OnResult is called after every target (serialized) so callers can
 	// checkpoint the output file incrementally.
-	OnResult func(TargetResult)
+	OnResult func(model.TargetResult)
 }
 
 // Runner executes the targeted recovery algorithm with a bounded worker
@@ -56,10 +61,10 @@ func NewRunner(cfg RecoveryConfig) (*Runner, error) {
 // Run processes targets with the configured worker pool. Targets already
 // completed in the state file are skipped unless Force is set. Returns the
 // results of this run (skipped targets are not re-emitted). A hard block
-// (ErrBlocked) stops dispatching new targets; in-flight targets finish and
+// (fetch.ErrBlocked) stops dispatching new targets; in-flight targets finish and
 // are checkpointed before the error is returned.
-func (r *Runner) Run(targets []RecoveryTarget) ([]TargetResult, error) {
-	pending := make([]RecoveryTarget, 0, len(targets))
+func (r *Runner) Run(targets []model.RecoveryTarget) ([]model.TargetResult, error) {
+	pending := make([]model.RecoveryTarget, 0, len(targets))
 	skipped := 0
 	for _, target := range targets {
 		if !r.cfg.Force && r.cfg.State.IsDone(target.ExpectedGoodreadsWorkID) {
@@ -82,11 +87,11 @@ func (r *Runner) Run(targets []RecoveryTarget) ([]TargetResult, error) {
 
 	var (
 		mu      sync.Mutex
-		results = make([]TargetResult, 0, len(pending))
+		results = make([]model.TargetResult, 0, len(pending))
 		runErr  error
 		done    int
 	)
-	jobs := make(chan RecoveryTarget)
+	jobs := make(chan model.RecoveryTarget)
 	stop := make(chan struct{})
 	var stopOnce sync.Once
 
@@ -123,12 +128,12 @@ func (r *Runner) Run(targets []RecoveryTarget) ([]TargetResult, error) {
 				if r.cfg.OnResult != nil {
 					r.cfg.OnResult(result)
 				}
-				if result.Status == StatusBlocked && runErr == nil {
-					runErr = ErrBlocked
+				if result.Status == model.StatusBlocked && runErr == nil {
+					runErr = fetch.ErrBlocked
 				}
 				mu.Unlock()
 
-				if result.Status == StatusBlocked {
+				if result.Status == model.StatusBlocked {
 					stopOnce.Do(func() { close(stop) })
 				}
 			}
@@ -149,8 +154,8 @@ dispatch:
 	return results, runErr
 }
 
-func (r *Runner) processTarget(target RecoveryTarget) TargetResult {
-	result := TargetResult{
+func (r *Runner) processTarget(target model.RecoveryTarget) model.TargetResult {
+	result := model.TargetResult{
 		ExpectedGoodreadsWorkID: target.ExpectedGoodreadsWorkID,
 		Title:                   target.Title,
 		Authors:                 target.Authors,
@@ -174,9 +179,9 @@ func (r *Runner) processTarget(target RecoveryTarget) TargetResult {
 
 		body, status, err := r.cfg.Fetcher.Fetch(url)
 		if err != nil {
-			if errors.Is(err, ErrBlocked) {
+			if errors.Is(err, fetch.ErrBlocked) {
 				result.Errors = append(result.Errors, err.Error())
-				return r.finish(result, StatusBlocked, SourceSkipped, nil)
+				return r.finish(result, model.StatusBlocked, model.SourceSkipped, nil)
 			}
 			result.Errors = append(result.Errors, fmt.Sprintf("fetch %s (status %d): %v", url, status, err))
 			continue
@@ -191,57 +196,57 @@ func (r *Runner) processTarget(target RecoveryTarget) TargetResult {
 		}
 		parsed.URL = url
 
-		identity := ValidateRecoveredBook(target, *parsed)
-		result.Warnings = append(result.Warnings, identity.Warnings...)
+		verdict := identity.ValidateRecoveredBook(target, *parsed)
+		result.Warnings = append(result.Warnings, verdict.Warnings...)
 
-		switch identity.Confidence {
-		case ConfidenceHigh, ConfidenceMedium:
-			parsed.ID = identity.ResolvedID
+		switch verdict.Confidence {
+		case identity.ConfidenceHigh, identity.ConfidenceMedium:
+			parsed.ID = verdict.ResolvedID
 			if !r.cfg.MeetsCriteria(parsed) {
 				result.Warnings = append(result.Warnings,
 					fmt.Sprintf("recovered page for %s no longer meets criteria (rating %.2f, ratings %d)",
 						url, parsed.Rating, parsed.Ratings))
-				return r.finish(result, StatusBelowThreshold, SourceSkipped, nil)
+				return r.finish(result, model.StatusBelowThreshold, model.SourceSkipped, nil)
 			}
-			return r.finish(result, StatusRecovered, SourceFetchedCurrentPage, parsed)
+			return r.finish(result, model.StatusRecovered, model.SourceFetchedCurrentPage, parsed)
 
-		case ConfidenceManualReview:
-			manualReviewReason = identity.Reason
-			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", url, identity.Reason))
+		case identity.ConfidenceManualReview:
+			manualReviewReason = verdict.Reason
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", url, verdict.Reason))
 
 		default: // rejected — maybe an alias URL matches instead
-			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", url, identity.Reason))
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", url, verdict.Reason))
 		}
 	}
 
 	if manualReviewReason != "" {
-		return r.finish(result, StatusManualReview, SourceSkipped, nil)
+		return r.finish(result, model.StatusManualReview, model.SourceSkipped, nil)
 	}
 
 	if fetchedAnything {
 		// Pages fetched but none parsed/validated into the expected work.
 		if len(result.Errors) > 0 {
-			return r.keepOrFail(result, target, StatusParseFailed)
+			return r.keepOrFail(result, target, model.StatusParseFailed)
 		}
-		return r.finish(result, StatusManualReview, SourceSkipped, nil)
+		return r.finish(result, model.StatusManualReview, model.SourceSkipped, nil)
 	}
 
-	return r.keepOrFail(result, target, StatusHTTPFailed)
+	return r.keepOrFail(result, target, model.StatusHTTPFailed)
 }
 
 // keepOrFail applies the -keep-previous-on-fail policy when the current page
 // could not be used.
-func (r *Runner) keepOrFail(result TargetResult, target RecoveryTarget, failStatus string) TargetResult {
+func (r *Runner) keepOrFail(result model.TargetResult, target model.RecoveryTarget, failStatus string) model.TargetResult {
 	if r.cfg.KeepPreviousOnFail {
 		old := target.OldSnapshotBook()
 		result.Warnings = append(result.Warnings,
 			"page fetch/parse failed; kept previous snapshot row so the dataset does not lose the book")
-		return r.finish(result, StatusKeptFromPrevious, SourcePreviousSnapshot, &old)
+		return r.finish(result, model.StatusKeptFromPrevious, model.SourcePreviousSnapshot, &old)
 	}
-	return r.finish(result, failStatus, SourceSkipped, nil)
+	return r.finish(result, failStatus, model.SourceSkipped, nil)
 }
 
-func (r *Runner) finish(result TargetResult, status, source string, final *book.Book) TargetResult {
+func (r *Runner) finish(result model.TargetResult, status, source string, final *book.Book) model.TargetResult {
 	result.Status = status
 	result.SelectedSource = source
 	result.FinalBook = final
@@ -251,8 +256,8 @@ func (r *Runner) finish(result TargetResult, status, source string, final *book.
 
 // FilterTargets selects targets by priority ("all" keeps everything) and
 // applies an optional limit (0 = no limit).
-func FilterTargets(targets []RecoveryTarget, priority string, limit int) []RecoveryTarget {
-	filtered := make([]RecoveryTarget, 0, len(targets))
+func FilterTargets(targets []model.RecoveryTarget, priority string, limit int) []model.RecoveryTarget {
+	filtered := make([]model.RecoveryTarget, 0, len(targets))
 	for _, t := range targets {
 		if priority != "" && priority != "all" && t.Priority != priority {
 			continue

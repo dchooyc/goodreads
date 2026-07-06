@@ -1,9 +1,11 @@
-package crawl
+package dataset
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"goodreads/internal/store"
 )
 
 func TestPriorityFor(t *testing.T) {
@@ -27,11 +29,11 @@ func TestPriorityFor(t *testing.T) {
 }
 
 func TestCompareOutputsFindsMissing(t *testing.T) {
-	oldBooks, err := ReadBooksFile("testdata/old-output.json")
+	oldBooks, err := store.ReadBooksFile("testdata/old-output.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	newBooks, err := ReadBooksFile("testdata/new-output-missing.json")
+	newBooks, err := store.ReadBooksFile("testdata/new-output-missing.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,8 +73,8 @@ func TestCompareOutputsFindsMissing(t *testing.T) {
 }
 
 func TestCompareOutputsDeterministic(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
-	newBooks, _ := ReadBooksFile("testdata/new-output-missing.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
+	newBooks, _ := store.ReadBooksFile("testdata/new-output-missing.json")
 
 	a := CompareOutputs(oldBooks.Books, newBooks.Books, "old.json", "new.json", "2026-07-06")
 	b := CompareOutputs(oldBooks.Books, newBooks.Books, "old.json", "new.json", "2026-07-06")
@@ -85,8 +87,8 @@ func TestCompareOutputsDeterministic(t *testing.T) {
 }
 
 func TestCompareOutputsReportsBlankIDMatches(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
-	newBooks, _ := ReadBooksFile("testdata/new-output-blank-id.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
+	newBooks, _ := store.ReadBooksFile("testdata/new-output-blank-id.json")
 
 	res := CompareOutputs(oldBooks.Books, newBooks.Books, "old.json", "new.json", "2026-07-06")
 

@@ -1,8 +1,10 @@
-package crawl
+package identity
 
 import (
 	"strings"
 	"unicode"
+
+	"goodreads/internal/model"
 
 	"github.com/dchooyc/book"
 )
@@ -148,7 +150,7 @@ func AuthorMatch(oldAuthors, newAuthors []string) bool {
 // ValidateRecoveredBook decides whether a parsed page confidently matches a
 // recovery target. It never silently replaces the expected work ID with a
 // different parsed ID.
-func ValidateRecoveredBook(target RecoveryTarget, parsed book.Book) IdentityResult {
+func ValidateRecoveredBook(target model.RecoveryTarget, parsed book.Book) IdentityResult {
 	titleExact := NormalizeTitle(target.Title) == NormalizeTitle(parsed.Title)
 	titleSim := TitleSimilarity(target.Title, parsed.Title)
 	authorOK := AuthorMatch(target.Authors, parsed.Authors)

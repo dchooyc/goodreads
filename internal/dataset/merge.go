@@ -1,7 +1,10 @@
-package crawl
+package dataset
 
 import (
 	"sort"
+
+	"goodreads/internal/identity"
+	"goodreads/internal/model"
 
 	"github.com/dchooyc/book"
 )
@@ -57,12 +60,12 @@ func recoveredRowWins(newRow, recovered book.Book) bool {
 // MergeOutputs starts from the new canonical output, layers in recovered
 // books by work ID, and quarantines blank-ID rows that match recovered
 // works. The merged output never contains duplicate or blank work IDs.
-func MergeOutputs(newRows []book.Book, recovery RecoveryOutput) (book.Books, MergeReport) {
+func MergeOutputs(newRows []book.Book, recovery model.RecoveryOutput) (book.Books, MergeReport) {
 	newCanonical, aliases := CanonicalizeBooks(newRows)
 
 	keptIDs := map[string]bool{}
 	for _, r := range recovery.TargetResults {
-		if r.Status == StatusKeptFromPrevious {
+		if r.Status == model.StatusKeptFromPrevious {
 			keptIDs[r.ExpectedGoodreadsWorkID] = true
 		}
 	}
@@ -85,7 +88,7 @@ func MergeOutputs(newRows []book.Book, recovery RecoveryOutput) (book.Books, Mer
 		if rec.ID == "" {
 			continue // never admit blank IDs into the canonical set
 		}
-		recoveredTitles[NormalizeTitle(rec.Title)] = true
+		recoveredTitles[identity.NormalizeTitle(rec.Title)] = true
 
 		existing, ok := merged[rec.ID]
 		if !ok {
@@ -112,7 +115,7 @@ func MergeOutputs(newRows []book.Book, recovery RecoveryOutput) (book.Books, Mer
 			continue
 		}
 		blankRows++
-		if recoveredTitles[NormalizeTitle(row.Title)] {
+		if recoveredTitles[identity.NormalizeTitle(row.Title)] {
 			report.BlankIDQuarantined = append(report.BlankIDQuarantined, row)
 		}
 	}

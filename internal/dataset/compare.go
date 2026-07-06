@@ -1,8 +1,11 @@
-package crawl
+package dataset
 
 import (
 	"sort"
 	"strings"
+
+	"goodreads/internal/identity"
+	"goodreads/internal/model"
 
 	"github.com/dchooyc/book"
 )
@@ -97,8 +100,8 @@ func CanonicalizeBooks(rows []book.Book) (map[string]book.Book, map[string][]str
 
 // CompareResult is everything produced by comparing old and new outputs.
 type CompareResult struct {
-	Targets           MissingTargetsFile
-	BlankIDCandidates []BlankIDCandidate
+	Targets           model.MissingTargetsFile
+	BlankIDCandidates []model.BlankIDCandidate
 }
 
 // CompareOutputs canonicalizes both outputs, computes the missing set
@@ -115,7 +118,7 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 		if row.URL != "" {
 			newByURL[row.URL] = true
 		}
-		if t := NormalizeTitle(row.Title); t != "" {
+		if t := identity.NormalizeTitle(row.Title); t != "" {
 			newByTitle[t] = append(newByTitle[t], row)
 		}
 	}
@@ -151,15 +154,15 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 		"no_new_raw_match":                                  0,
 	}
 
-	targets := make([]RecoveryTarget, 0, len(missingIDs))
-	candidates := make([]BlankIDCandidate, 0)
+	targets := make([]model.RecoveryTarget, 0, len(missingIDs))
+	candidates := make([]model.BlankIDCandidate, 0)
 
 	for _, id := range missingIDs {
 		old := oldCanonical[id]
 		priority := PriorityFor(old.Ratings, old.Reviews)
 		priorityCounts[priority]++
 
-		targets = append(targets, RecoveryTarget{
+		targets = append(targets, model.RecoveryTarget{
 			Priority:                priority,
 			ExpectedGoodreadsWorkID: id,
 			Title:                   old.Title,
@@ -181,14 +184,14 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 			matched = true
 		}
 
-		titleRows := newByTitle[NormalizeTitle(old.Title)]
+		titleRows := newByTitle[identity.NormalizeTitle(old.Title)]
 		if len(titleRows) > 0 {
 			matchCounts["same_normalized_title_in_new_raw"]++
 			matched = true
 		}
 
 		for _, row := range titleRows {
-			authorOK := AuthorMatch(old.Authors, row.Authors)
+			authorOK := identity.AuthorMatch(old.Authors, row.Authors)
 			if authorOK {
 				matchCounts["same_normalized_title_and_first_author_in_new_raw"]++
 			}
@@ -196,7 +199,7 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 			switch {
 			case row.ID == "" && authorOK:
 				matchCounts["has_blank_id_possible_match"]++
-				candidates = append(candidates, BlankIDCandidate{
+				candidates = append(candidates, model.BlankIDCandidate{
 					Title:                         row.Title,
 					Authors:                       row.Authors,
 					URL:                           row.URL,
@@ -206,7 +209,7 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 					Reason:                        "same normalized title and first author as missing old work",
 				})
 			case row.ID == "":
-				candidates = append(candidates, BlankIDCandidate{
+				candidates = append(candidates, model.BlankIDCandidate{
 					Title:                         row.Title,
 					Authors:                       row.Authors,
 					URL:                           row.URL,
@@ -233,7 +236,7 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 		return candidates[i].PossibleExpectedWorkIDFromOld < candidates[j].PossibleExpectedWorkIDFromOld
 	})
 
-	summary := MissingSummary{
+	summary := model.MissingSummary{
 		GeneratedAt:                  generatedAt,
 		OldFile:                      oldFile,
 		NewFile:                      newFile,
@@ -253,7 +256,7 @@ func CompareOutputs(oldRows, newRows []book.Book, oldFile, newFile, generatedAt 
 	}
 
 	return CompareResult{
-		Targets:           MissingTargetsFile{Summary: summary, CheckTargets: targets},
+		Targets:           model.MissingTargetsFile{Summary: summary, CheckTargets: targets},
 		BlankIDCandidates: candidates,
 	}
 }

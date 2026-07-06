@@ -8,25 +8,25 @@ import (
 	"fmt"
 	"os"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/store"
 )
 
 func main() {
 	inPath := flag.String("in", "output.json", "books JSON file or folder to read")
 	outDir := flag.String("out", "output", "output folder for chunk files")
-	chunkSize := flag.Int("chunk", crawl.DefaultChunkSize, "books per chunk file")
+	chunkSize := flag.Int("chunk", store.DefaultChunkSize, "books per chunk file")
 	flag.Parse()
 
-	books, err := crawl.ReadBooks(*inPath)
+	books, err := store.ReadBooks(*inPath)
 	if err != nil {
 		fail(err)
 	}
 
-	if err := crawl.WriteBooksDir(*outDir, *books, *chunkSize); err != nil {
+	if err := store.WriteBooksDir(*outDir, *books, *chunkSize); err != nil {
 		fail(err)
 	}
 
-	chunks, err := crawl.ListBookChunks(*outDir)
+	chunks, err := store.ListBookChunks(*outDir)
 	if err != nil {
 		fail(err)
 	}

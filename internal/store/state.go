@@ -1,10 +1,12 @@
-package crawl
+package store
 
 import (
 	"errors"
 	"io/fs"
 	"sync"
 	"time"
+
+	"goodreads/internal/model"
 )
 
 // TargetState is the per-target checkpoint record.
@@ -66,7 +68,7 @@ func (s *State) IsDone(workID string) bool {
 		return false
 	}
 	switch ts.Status {
-	case StatusRecovered, StatusKeptFromPrevious, StatusBelowThreshold, StatusManualReview, StatusParseFailed, StatusUpdated:
+	case model.StatusRecovered, model.StatusKeptFromPrevious, model.StatusBelowThreshold, model.StatusManualReview, model.StatusParseFailed, model.StatusUpdated:
 		return true
 	}
 	return false

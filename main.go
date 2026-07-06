@@ -9,7 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/fetch"
+	"goodreads/internal/store"
 
 	"github.com/dchooyc/book"
 )
@@ -46,7 +47,7 @@ func main() {
 	timeout := flag.Duration("timeout", 30*time.Second, "Per-request timeout")
 	maxRetries := flag.Int("max-retries", 3, "Max retries per URL")
 	flushEvery := flag.Int("flush-every", 100, "checkpoint the output after this many new books (0 = only at the end)")
-	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "User-Agent header")
+	userAgent := flag.String("user-agent", fetch.DefaultUserAgent, "User-Agent header")
 	flag.Parse()
 
 	retrieved, err := retrieveFile(*input)
@@ -54,7 +55,7 @@ func main() {
 		fmt.Printf("retrieve file failed: %s\n", *input)
 	}
 
-	client := crawl.NewClient(*userAgent, *delay, *timeout, *maxRetries)
+	client := fetch.NewClient(*userAgent, *delay, *timeout, *maxRetries)
 	getBook := makeGetBook(client)
 	getBookURLs := makeGetBookURLs(client)
 
@@ -63,7 +64,7 @@ func main() {
 	// flush checkpoints everything collected so far; a crash or kill loses at
 	// most the books gathered since the previous flush.
 	flush := func() {
-		if err := crawl.WriteBooks(*output, arrangeBooks(urlToBook), crawl.DefaultChunkSize); err != nil {
+		if err := store.WriteBooks(*output, arrangeBooks(urlToBook), store.DefaultChunkSize); err != nil {
 			fmt.Println("checkpoint write failed:", err)
 		}
 	}
@@ -96,7 +97,7 @@ func createQueue(retrieved *book.Books, root string) []string {
 }
 
 func retrieveFile(target string) (*book.Books, error) {
-	return crawl.ReadBooks(target)
+	return store.ReadBooks(target)
 }
 
 func arrangeBooks(urlToBook map[string]*book.Book) book.Books {
@@ -255,7 +256,7 @@ func isEnglish(text string) bool {
 	return true
 }
 
-func makeGetBookURLs(client crawl.Fetcher) similarFetcher {
+func makeGetBookURLs(client fetch.Fetcher) similarFetcher {
 	return func(id string) ([]string, error) {
 		path := goodreadsPrefix + similarPath + id
 
@@ -286,7 +287,7 @@ func makeGetBookURLs(client crawl.Fetcher) similarFetcher {
 	}
 }
 
-func makeGetBook(client crawl.Fetcher) bookFetcher {
+func makeGetBook(client fetch.Fetcher) bookFetcher {
 	return func(urlString string) (*book.Book, error) {
 		body, _, err := client.Fetch(urlString)
 		if err != nil {

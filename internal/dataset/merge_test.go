@@ -1,19 +1,22 @@
-package crawl
+package dataset
 
 import (
 	"testing"
 
 	"github.com/dchooyc/book"
+
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 )
 
-func loadMergeFixtures(t *testing.T) ([]book.Book, RecoveryOutput) {
+func loadMergeFixtures(t *testing.T) ([]book.Book, model.RecoveryOutput) {
 	t.Helper()
-	newBooks, err := ReadBooksFile("testdata/new-output-blank-id.json")
+	newBooks, err := store.ReadBooksFile("testdata/new-output-blank-id.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var recovered RecoveryOutput
-	if err := ReadJSONFile("testdata/recovered-output.json", &recovered); err != nil {
+	var recovered model.RecoveryOutput
+	if err := store.ReadJSONFile("testdata/recovered-output.json", &recovered); err != nil {
 		t.Fatal(err)
 	}
 	return newBooks.Books, recovered
@@ -70,7 +73,7 @@ func TestMergeChoosesBestCanonicalRow(t *testing.T) {
 	newRows := []book.Book{
 		{ID: "1", Title: "Book", URL: "https://example.com/new", Ratings: 100, Reviews: 10, CoverUrl: "x"},
 	}
-	recovered := RecoveryOutput{
+	recovered := model.RecoveryOutput{
 		Books: []book.Book{
 			{ID: "1", Title: "Book", URL: "https://example.com/recovered", Ratings: 200, Reviews: 20, CoverUrl: "y"},
 		},
@@ -99,7 +102,7 @@ func TestMergeChoosesBestCanonicalRow(t *testing.T) {
 }
 
 func TestMergeNeverAdmitsBlankRecoveredIDs(t *testing.T) {
-	merged, _ := MergeOutputs(nil, RecoveryOutput{Books: []book.Book{{ID: "", Title: "Ghost"}}})
+	merged, _ := MergeOutputs(nil, model.RecoveryOutput{Books: []book.Book{{ID: "", Title: "Ghost"}}})
 	if len(merged.Books) != 0 {
 		t.Fatalf("blank-ID recovered book must not enter merged output: %+v", merged.Books)
 	}

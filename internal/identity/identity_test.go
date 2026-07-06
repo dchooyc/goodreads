@@ -1,7 +1,9 @@
-package crawl
+package identity
 
 import (
 	"testing"
+
+	"goodreads/internal/model"
 
 	"github.com/dchooyc/book"
 )
@@ -47,8 +49,8 @@ func TestAuthorMatch(t *testing.T) {
 	}
 }
 
-func target() RecoveryTarget {
-	return RecoveryTarget{
+func target() model.RecoveryTarget {
+	return model.RecoveryTarget{
 		ExpectedGoodreadsWorkID: "13155899",
 		Title:                   "Divergent",
 		Authors:                 []string{"Veronica Roth"},

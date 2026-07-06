@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/dataset"
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 )
 
 func main() {
@@ -18,25 +20,25 @@ func main() {
 	recoveredPath := flag.String("recovered", "", "optional recovery result file (counts as recovery decisions)")
 	flag.Parse()
 
-	oldBooks, err := crawl.ReadBooks(*oldPath)
+	oldBooks, err := store.ReadBooks(*oldPath)
 	if err != nil {
 		fail(err)
 	}
-	newBooks, err := crawl.ReadBooks(*newPath)
+	newBooks, err := store.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}
 
-	var recovery *crawl.RecoveryOutput
+	var recovery *model.RecoveryOutput
 	if *recoveredPath != "" {
-		var r crawl.RecoveryOutput
-		if err := crawl.ReadJSONFile(*recoveredPath, &r); err != nil {
+		var r model.RecoveryOutput
+		if err := store.ReadJSONFile(*recoveredPath, &r); err != nil {
 			fail(err)
 		}
 		recovery = &r
 	}
 
-	report := crawl.RunQA(oldBooks.Books, newBooks.Books, recovery)
+	report := dataset.RunQA(oldBooks.Books, newBooks.Books, recovery)
 
 	m := report.Metrics
 	fmt.Printf("raw rows: %d, canonical: %d, blank-ID rate: %.2f%%\n", m.RawRows, m.CanonicalNonblankIDs, m.BlankIDRate*100)

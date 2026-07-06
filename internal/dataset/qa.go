@@ -1,9 +1,12 @@
-package crawl
+package dataset
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"goodreads/internal/identity"
+	"goodreads/internal/model"
 
 	"github.com/dchooyc/book"
 )
@@ -41,16 +44,16 @@ type QAReport struct {
 // decisionStatuses are recovery outcomes that count as an explicit decision
 // for a missing work.
 var decisionStatuses = map[string]bool{
-	StatusRecovered:        true,
-	StatusKeptFromPrevious: true,
-	StatusBelowThreshold:   true,
-	StatusManualReview:     true,
+	model.StatusRecovered:        true,
+	model.StatusKeptFromPrevious: true,
+	model.StatusBelowThreshold:   true,
+	model.StatusManualReview:     true,
 }
 
 // RunQA computes crawl quality metrics for newRows (the output being
 // accepted) against oldRows (the previous accepted output), and applies the
 // hard gates. recovery may be nil when no recovery run happened.
-func RunQA(oldRows, newRows []book.Book, recovery *RecoveryOutput) QAReport {
+func RunQA(oldRows, newRows []book.Book, recovery *model.RecoveryOutput) QAReport {
 	oldCanonical, _ := CanonicalizeBooks(oldRows)
 	newCanonical, _ := CanonicalizeBooks(newRows)
 
@@ -72,7 +75,7 @@ func RunQA(oldRows, newRows []book.Book, recovery *RecoveryOutput) QAReport {
 		if row.Genres == nil {
 			m.NullGenreRows++
 		}
-		if t := NormalizeTitle(row.Title); t != "" {
+		if t := identity.NormalizeTitle(row.Title); t != "" {
 			if row.ID == "" && newTitles[t] {
 				m.SameTitleBlankIDRows++
 			}
@@ -104,7 +107,7 @@ func RunQA(oldRows, newRows []book.Book, recovery *RecoveryOutput) QAReport {
 		}
 		m.FetchFailuresByStatus = map[string]int{}
 		for _, r := range recovery.TargetResults {
-			if r.Status == StatusHTTPFailed || r.Status == StatusBlocked {
+			if r.Status == model.StatusHTTPFailed || r.Status == model.StatusBlocked {
 				m.FetchFailuresByStatus[r.Status]++
 			}
 		}

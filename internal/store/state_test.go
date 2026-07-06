@@ -1,10 +1,12 @@
-package crawl
+package store
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"goodreads/internal/model"
 )
 
 func TestStateRoundTrip(t *testing.T) {
@@ -18,10 +20,10 @@ func TestStateRoundTrip(t *testing.T) {
 		t.Fatal("fresh state should have no completed targets")
 	}
 
-	if err := s.Update("1", StatusRecovered, []string{"https://example.com/a"}, ""); err != nil {
+	if err := s.Update("1", model.StatusRecovered, []string{"https://example.com/a"}, ""); err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	if err := s.Update("2", StatusHTTPFailed, []string{"https://example.com/b"}, "boom"); err != nil {
+	if err := s.Update("2", model.StatusHTTPFailed, []string{"https://example.com/b"}, "boom"); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
@@ -48,7 +50,7 @@ func TestStateWritesAtomically(t *testing.T) {
 	path := filepath.Join(dir, "recovery-state.json")
 
 	s, _ := LoadState(path)
-	if err := s.Update("1", StatusRecovered, nil, ""); err != nil {
+	if err := s.Update("1", model.StatusRecovered, nil, ""); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 

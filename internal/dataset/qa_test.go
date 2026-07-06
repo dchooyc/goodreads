@@ -1,15 +1,18 @@
-package crawl
+package dataset
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/dchooyc/book"
+
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 )
 
 func TestQAFailsWhenP0MissingUndecided(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
-	newBooks, _ := ReadBooksFile("testdata/new-output-missing.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
+	newBooks, _ := store.ReadBooksFile("testdata/new-output-missing.json")
 
 	report := RunQA(oldBooks.Books, newBooks.Books, nil)
 
@@ -25,11 +28,11 @@ func TestQAFailsWhenP0MissingUndecided(t *testing.T) {
 }
 
 func TestQAPassesWithRecoveryDecisions(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
-	newBooks, _ := ReadBooksFile("testdata/new-output-missing.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
+	newBooks, _ := store.ReadBooksFile("testdata/new-output-missing.json")
 
-	var recovery RecoveryOutput
-	if err := ReadJSONFile("testdata/recovered-output.json", &recovery); err != nil {
+	var recovery model.RecoveryOutput
+	if err := store.ReadJSONFile("testdata/recovered-output.json", &recovery); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +49,7 @@ func TestQAPassesWithRecoveryDecisions(t *testing.T) {
 }
 
 func TestQAFailsOnCanonicalCountDrop(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
 
 	// New output lost most canonical IDs.
 	report := RunQA(oldBooks.Books, oldBooks.Books[:1], nil)
@@ -57,7 +60,7 @@ func TestQAFailsOnCanonicalCountDrop(t *testing.T) {
 }
 
 func TestQABlankIDRateGate(t *testing.T) {
-	oldBooks, _ := ReadBooksFile("testdata/old-output.json")
+	oldBooks, _ := store.ReadBooksFile("testdata/old-output.json")
 
 	// Same books, but one gains a blank ID (25% blank rate vs 0% before).
 	newBooks := make([]book.Book, len(oldBooks.Books))

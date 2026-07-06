@@ -9,7 +9,8 @@ import (
 	"os"
 	"time"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/dataset"
+	"goodreads/internal/store"
 )
 
 func main() {
@@ -20,21 +21,21 @@ func main() {
 	generatedAt := flag.String("generated-at", time.Now().UTC().Format("2006-01-02"), "generated_at stamp (fix for reproducible output)")
 	flag.Parse()
 
-	oldBooks, err := crawl.ReadBooks(*oldPath)
+	oldBooks, err := store.ReadBooks(*oldPath)
 	if err != nil {
 		fail(err)
 	}
-	newBooks, err := crawl.ReadBooks(*newPath)
+	newBooks, err := store.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}
 
-	res := crawl.CompareOutputs(oldBooks.Books, newBooks.Books, *oldPath, *newPath, *generatedAt)
+	res := dataset.CompareOutputs(oldBooks.Books, newBooks.Books, *oldPath, *newPath, *generatedAt)
 
-	if err := crawl.WriteJSONFileAtomic(*outPath, res.Targets); err != nil {
+	if err := store.WriteJSONFileAtomic(*outPath, res.Targets); err != nil {
 		fail(err)
 	}
-	if err := crawl.WriteJSONFileAtomic(*blankOut, res.BlankIDCandidates); err != nil {
+	if err := store.WriteJSONFileAtomic(*blankOut, res.BlankIDCandidates); err != nil {
 		fail(err)
 	}
 

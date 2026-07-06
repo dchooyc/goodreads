@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/dataset"
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 )
 
 func main() {
@@ -18,28 +20,28 @@ func main() {
 	outPath := flag.String("out", "output", "merged output file or folder")
 	flag.Parse()
 
-	newBooks, err := crawl.ReadBooks(*newPath)
+	newBooks, err := store.ReadBooks(*newPath)
 	if err != nil {
 		fail(err)
 	}
 
-	var recovered crawl.RecoveryOutput
-	if err := crawl.ReadJSONFile(*recoveredPath, &recovered); err != nil {
+	var recovered model.RecoveryOutput
+	if err := store.ReadJSONFile(*recoveredPath, &recovered); err != nil {
 		fail(err)
 	}
 
-	merged, report := crawl.MergeOutputs(newBooks.Books, recovered)
+	merged, report := dataset.MergeOutputs(newBooks.Books, recovered)
 
 	if *oldPath != "" {
-		if oldBooks, err := crawl.ReadBooks(*oldPath); err == nil {
-			oldCanonical, _ := crawl.CanonicalizeBooks(oldBooks.Books)
+		if oldBooks, err := store.ReadBooks(*oldPath); err == nil {
+			oldCanonical, _ := dataset.CanonicalizeBooks(oldBooks.Books)
 			fmt.Printf("old canonical books: %d\n", len(oldCanonical))
 		} else {
 			fmt.Println("warning: could not read old output:", err)
 		}
 	}
 
-	if err := crawl.WriteBooks(*outPath, merged, 0); err != nil {
+	if err := store.WriteBooks(*outPath, merged, 0); err != nil {
 		fail(err)
 	}
 

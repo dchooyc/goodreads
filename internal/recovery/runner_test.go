@@ -1,4 +1,4 @@
-package crawl
+package recovery
 
 import (
 	"errors"
@@ -7,6 +7,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"goodreads/internal/fetch"
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 
 	"github.com/dchooyc/book"
 )
@@ -50,9 +54,9 @@ func fakeParser(books map[string]book.Book) func([]byte) (*book.Book, error) {
 	}
 }
 
-func testRunner(t *testing.T, fetcher Fetcher, parser func([]byte) (*book.Book, error), keep bool) (*Runner, *State) {
+func testRunner(t *testing.T, fetcher fetch.Fetcher, parser func([]byte) (*book.Book, error), keep bool) (*Runner, *store.State) {
 	t.Helper()
-	state, err := LoadState(filepath.Join(t.TempDir(), "state.json"))
+	state, err := store.LoadState(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,8 +75,8 @@ func testRunner(t *testing.T, fetcher Fetcher, parser func([]byte) (*book.Book, 
 	return runner, state
 }
 
-func divergentTarget() RecoveryTarget {
-	return RecoveryTarget{
+func divergentTarget() model.RecoveryTarget {
+	return model.RecoveryTarget{
 		Priority:                "P0",
 		ExpectedGoodreadsWorkID: "13155899",
 		Title:                   "Divergent",
@@ -94,15 +98,15 @@ func TestRecoverExactMatch(t *testing.T) {
 	})
 
 	runner, state := testRunner(t, fetcher, parser, false)
-	results, err := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, err := runner.Run([]model.RecoveryTarget{divergentTarget()})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(results) != 1 || results[0].Status != StatusRecovered {
+	if len(results) != 1 || results[0].Status != model.StatusRecovered {
 		t.Fatalf("want recovered, got %+v", results)
 	}
-	if results[0].SelectedSource != SourceFetchedCurrentPage {
+	if results[0].SelectedSource != model.SourceFetchedCurrentPage {
 		t.Errorf("wrong source: %s", results[0].SelectedSource)
 	}
 	if results[0].FinalBook == nil || results[0].FinalBook.URL != "https://example.com/divergent" {
@@ -122,10 +126,10 @@ func TestRecoverBlankIDFillsExpected(t *testing.T) {
 	})
 
 	runner, _ := testRunner(t, fetcher, parser, false)
-	results, _ := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, _ := runner.Run([]model.RecoveryTarget{divergentTarget()})
 
 	r := results[0]
-	if r.Status != StatusRecovered {
+	if r.Status != model.StatusRecovered {
 		t.Fatalf("want recovered, got %s (%v)", r.Status, r.Errors)
 	}
 	if r.FinalBook.ID != "13155899" {
@@ -146,10 +150,10 @@ func TestRecoverDifferentIDNeedsManualReview(t *testing.T) {
 	})
 
 	runner, _ := testRunner(t, fetcher, parser, false)
-	results, _ := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, _ := runner.Run([]model.RecoveryTarget{divergentTarget()})
 
 	r := results[0]
-	if r.Status != StatusManualReview {
+	if r.Status != model.StatusManualReview {
 		t.Fatalf("different ID must need manual review, got %s", r.Status)
 	}
 	if r.FinalBook != nil {
@@ -166,9 +170,9 @@ func TestRecoverBelowThreshold(t *testing.T) {
 	})
 
 	runner, _ := testRunner(t, fetcher, parser, false)
-	results, _ := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, _ := runner.Run([]model.RecoveryTarget{divergentTarget()})
 
-	if results[0].Status != StatusBelowThreshold {
+	if results[0].Status != model.StatusBelowThreshold {
 		t.Fatalf("want below_threshold, got %s", results[0].Status)
 	}
 }
@@ -177,13 +181,13 @@ func TestRecoverKeepPreviousOnFail(t *testing.T) {
 	fetcher := &fakeFetcher{responses: map[string]fakeResponse{}} // every fetch errors
 
 	runner, _ := testRunner(t, fetcher, fakeParser(nil), true)
-	results, _ := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, _ := runner.Run([]model.RecoveryTarget{divergentTarget()})
 
 	r := results[0]
-	if r.Status != StatusKeptFromPrevious {
+	if r.Status != model.StatusKeptFromPrevious {
 		t.Fatalf("want kept_from_previous_snapshot, got %s (%v)", r.Status, r.Errors)
 	}
-	if r.SelectedSource != SourcePreviousSnapshot {
+	if r.SelectedSource != model.SourcePreviousSnapshot {
 		t.Errorf("wrong source: %s", r.SelectedSource)
 	}
 	if r.FinalBook == nil || r.FinalBook.ID != "13155899" || r.FinalBook.Ratings != 4299183 {
@@ -198,9 +202,9 @@ func TestRecoverHTTPFailedWithoutKeep(t *testing.T) {
 	fetcher := &fakeFetcher{responses: map[string]fakeResponse{}}
 
 	runner, _ := testRunner(t, fetcher, fakeParser(nil), false)
-	results, _ := runner.Run([]RecoveryTarget{divergentTarget()})
+	results, _ := runner.Run([]model.RecoveryTarget{divergentTarget()})
 
-	if results[0].Status != StatusHTTPFailed {
+	if results[0].Status != model.StatusHTTPFailed {
 		t.Fatalf("want http_failed, got %s", results[0].Status)
 	}
 	if results[0].FinalBook != nil {
@@ -217,7 +221,7 @@ func TestRecoverResumeSkipsCompleted(t *testing.T) {
 	})
 
 	runner, state := testRunner(t, fetcher, parser, false)
-	if _, err := runner.Run([]RecoveryTarget{divergentTarget()}); err != nil {
+	if _, err := runner.Run([]model.RecoveryTarget{divergentTarget()}); err != nil {
 		t.Fatal(err)
 	}
 	firstCalls := len(fetcher.calls)
@@ -229,7 +233,7 @@ func TestRecoverResumeSkipsCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	results, err := runner2.Run([]RecoveryTarget{divergentTarget()})
+	results, err := runner2.Run([]model.RecoveryTarget{divergentTarget()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +247,7 @@ func TestRecoverResumeSkipsCompleted(t *testing.T) {
 
 func TestRecoverBlockedStopsRun(t *testing.T) {
 	fetcher := &fakeFetcher{responses: map[string]fakeResponse{
-		"https://example.com/divergent": {status: 403, err: ErrBlocked},
+		"https://example.com/divergent": {status: 403, err: fetch.ErrBlocked},
 	}}
 
 	second := divergentTarget()
@@ -251,26 +255,26 @@ func TestRecoverBlockedStopsRun(t *testing.T) {
 	second.PrimaryOldURL = "https://example.com/other"
 
 	runner, _ := testRunner(t, fetcher, fakeParser(nil), false)
-	results, err := runner.Run([]RecoveryTarget{divergentTarget(), second})
+	results, err := runner.Run([]model.RecoveryTarget{divergentTarget(), second})
 
-	if !errors.Is(err, ErrBlocked) {
-		t.Fatalf("run must surface ErrBlocked, got %v", err)
+	if !errors.Is(err, fetch.ErrBlocked) {
+		t.Fatalf("run must surface fetch.ErrBlocked, got %v", err)
 	}
-	if len(results) != 1 || results[0].Status != StatusBlocked {
+	if len(results) != 1 || results[0].Status != model.StatusBlocked {
 		t.Fatalf("first target should be marked blocked and run stopped, got %+v", results)
 	}
 }
 
 func TestRecoverConcurrentWorkers(t *testing.T) {
 	const n = 40
-	targets := make([]RecoveryTarget, 0, n)
+	targets := make([]model.RecoveryTarget, 0, n)
 	responses := map[string]fakeResponse{}
 	books := map[string]book.Book{}
 	for i := 0; i < n; i++ {
 		id := fmt.Sprintf("id-%d", i)
 		url := fmt.Sprintf("https://example.com/book-%d", i)
 		body := fmt.Sprintf("page-%d", i)
-		targets = append(targets, RecoveryTarget{
+		targets = append(targets, model.RecoveryTarget{
 			Priority:                "P0",
 			ExpectedGoodreadsWorkID: id,
 			Title:                   fmt.Sprintf("Book %d", i),
@@ -281,7 +285,7 @@ func TestRecoverConcurrentWorkers(t *testing.T) {
 		books[body] = book.Book{ID: id, Title: fmt.Sprintf("Book %d", i), Authors: []string{"Author"}, Rating: 4.5, Ratings: 1000}
 	}
 
-	state, err := LoadState(filepath.Join(t.TempDir(), "state.json"))
+	state, err := store.LoadState(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +296,7 @@ func TestRecoverConcurrentWorkers(t *testing.T) {
 		ParseBook: fakeParser(books),
 		Workers:   8,
 		Logf:      func(string, ...interface{}) {},
-		OnResult:  func(TargetResult) { onResultCalls++ }, // serialized by the runner
+		OnResult:  func(model.TargetResult) { onResultCalls++ }, // serialized by the runner
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -313,7 +317,7 @@ func TestRecoverConcurrentWorkers(t *testing.T) {
 }
 
 func TestFilterTargets(t *testing.T) {
-	targets := []RecoveryTarget{
+	targets := []model.RecoveryTarget{
 		{Priority: "P0", ExpectedGoodreadsWorkID: "1"},
 		{Priority: "P1", ExpectedGoodreadsWorkID: "2"},
 		{Priority: "P0", ExpectedGoodreadsWorkID: "3"},
@@ -330,13 +334,13 @@ func TestFilterTargets(t *testing.T) {
 }
 
 func TestBuildRecoveryOutput(t *testing.T) {
-	prev := []TargetResult{
-		{ExpectedGoodreadsWorkID: "1", Status: StatusHTTPFailed},
-		{ExpectedGoodreadsWorkID: "2", Status: StatusRecovered, FinalBook: &book.Book{ID: "2", Ratings: 100}},
+	prev := []model.TargetResult{
+		{ExpectedGoodreadsWorkID: "1", Status: model.StatusHTTPFailed},
+		{ExpectedGoodreadsWorkID: "2", Status: model.StatusRecovered, FinalBook: &book.Book{ID: "2", Ratings: 100}},
 	}
-	cur := []TargetResult{
-		{ExpectedGoodreadsWorkID: "1", Status: StatusRecovered, FinalBook: &book.Book{ID: "1", Ratings: 900}},
-		{ExpectedGoodreadsWorkID: "3", Status: StatusManualReview},
+	cur := []model.TargetResult{
+		{ExpectedGoodreadsWorkID: "1", Status: model.StatusRecovered, FinalBook: &book.Book{ID: "1", Ratings: 900}},
+		{ExpectedGoodreadsWorkID: "3", Status: model.StatusManualReview},
 	}
 
 	out := BuildRecoveryOutput(10, prev, cur)

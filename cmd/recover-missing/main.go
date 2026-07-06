@@ -14,7 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/fetch"
+	"goodreads/internal/model"
+	"goodreads/internal/recovery"
+	"goodreads/internal/store"
 
 	"github.com/dchooyc/book"
 )
@@ -31,45 +34,45 @@ func main() {
 	maxRetries := flag.Int("max-retries", 3, "max retries per URL")
 	force := flag.Bool("force", false, "re-process targets already completed in the state file")
 	keepPrevious := flag.Bool("keep-previous-on-fail", false, "fall back to the previous snapshot row when the page cannot be fetched")
-	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "identifying User-Agent header")
+	userAgent := flag.String("user-agent", fetch.DefaultUserAgent, "identifying User-Agent header")
 	flag.Parse()
 
-	var targetsFile crawl.MissingTargetsFile
-	if err := crawl.ReadJSONFile(*targetsPath, &targetsFile); err != nil {
+	var targetsFile model.MissingTargetsFile
+	if err := store.ReadJSONFile(*targetsPath, &targetsFile); err != nil {
 		fail(err)
 	}
 
-	selected := crawl.FilterTargets(targetsFile.CheckTargets, *priority, *limit)
+	selected := recovery.FilterTargets(targetsFile.CheckTargets, *priority, *limit)
 	fmt.Printf("targets: %d total, %d selected (priority=%s limit=%d)\n",
 		len(targetsFile.CheckTargets), len(selected), *priority, *limit)
 
-	state, err := crawl.LoadState(*statePath)
+	state, err := store.LoadState(*statePath)
 	if err != nil {
 		fail(err)
 	}
 
 	// Keep results from earlier interrupted/resumed runs so the output file
 	// stays complete.
-	var previousResults []crawl.TargetResult
-	var existing crawl.RecoveryOutput
-	if err := crawl.ReadJSONFile(*outPath, &existing); err == nil {
+	var previousResults []model.TargetResult
+	var existing model.RecoveryOutput
+	if err := store.ReadJSONFile(*outPath, &existing); err == nil {
 		previousResults = existing.TargetResults
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		fmt.Println("warning: could not read existing output, starting fresh:", err)
 	}
 
-	client := crawl.NewClient(*userAgent, *delay, *timeout, *maxRetries)
+	client := fetch.NewClient(*userAgent, *delay, *timeout, *maxRetries)
 
-	currentResults := []crawl.TargetResult{}
-	writeOutputs := func() crawl.RecoveryOutput {
-		out := crawl.BuildRecoveryOutput(len(targetsFile.CheckTargets), previousResults, currentResults)
-		if err := crawl.WriteJSONFileAtomic(*outPath, out); err != nil {
+	currentResults := []model.TargetResult{}
+	writeOutputs := func() model.RecoveryOutput {
+		out := recovery.BuildRecoveryOutput(len(targetsFile.CheckTargets), previousResults, currentResults)
+		if err := store.WriteJSONFileAtomic(*outPath, out); err != nil {
 			fmt.Println("warning: writing output failed:", err)
 		}
 		return out
 	}
 
-	runner, err := crawl.NewRunner(crawl.RecoveryConfig{
+	runner, err := recovery.NewRunner(recovery.RecoveryConfig{
 		Fetcher:            client,
 		State:              state,
 		ParseBook:          parseBook,
@@ -77,7 +80,7 @@ func main() {
 		KeepPreviousOnFail: *keepPrevious,
 		Force:              *force,
 		Workers:            *workers,
-		OnResult: func(r crawl.TargetResult) {
+		OnResult: func(r model.TargetResult) {
 			// Called serialized by the runner. Flush the output every target:
 			// state is checkpointed per target, and if the two diverge (e.g.
 			// the process is killed between flushes) a resume skips the
@@ -100,7 +103,7 @@ func main() {
 	fmt.Printf("wrote %s, state in %s\n", *outPath, *statePath)
 
 	if runErr != nil {
-		if errors.Is(runErr, crawl.ErrBlocked) {
+		if errors.Is(runErr, fetch.ErrBlocked) {
 			fmt.Fprintln(os.Stderr, "recover-missing: hard stop — repeated 403/429 from server. Wait before resuming; the run is checkpointed.")
 			os.Exit(2)
 		}

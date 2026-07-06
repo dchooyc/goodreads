@@ -15,7 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"goodreads/internal/crawl"
+	"goodreads/internal/fetch"
+	"goodreads/internal/identity"
+	"goodreads/internal/model"
+	"goodreads/internal/store"
 
 	"github.com/dchooyc/book"
 )
@@ -31,10 +34,10 @@ func main() {
 	force := flag.Bool("force", false, "re-update chunks already completed in the state file")
 	flushEvery := flag.Int("flush-every", 200, "rewrite the chunk file after this many refreshed books")
 	resort := flag.Bool("resort", true, "after a full update, resort all books by ratings descending")
-	userAgent := flag.String("user-agent", crawl.DefaultUserAgent, "identifying User-Agent header")
+	userAgent := flag.String("user-agent", fetch.DefaultUserAgent, "identifying User-Agent header")
 	flag.Parse()
 
-	chunks, err := crawl.ListBookChunks(*outputDir)
+	chunks, err := store.ListBookChunks(*outputDir)
 	if err != nil {
 		fail(err)
 	}
@@ -42,12 +45,12 @@ func main() {
 		fail(fmt.Errorf("no chunk files in %s", *outputDir))
 	}
 
-	state, err := crawl.LoadState(*statePath)
+	state, err := store.LoadState(*statePath)
 	if err != nil {
 		fail(err)
 	}
 
-	client := crawl.NewClient(*userAgent, *delay, *timeout, *maxRetries)
+	client := fetch.NewClient(*userAgent, *delay, *timeout, *maxRetries)
 
 	stats := struct{ updated, warned, failed, processed int }{}
 	blocked := false
@@ -67,7 +70,7 @@ func main() {
 			break
 		}
 
-		books, err := crawl.ReadBooksFile(chunkPath)
+		books, err := store.ReadBooksFile(chunkPath)
 		if err != nil {
 			fail(err)
 		}
@@ -81,7 +84,7 @@ func main() {
 		completed := updateChunk(client, books, todo, *workers, *flushEvery, chunkPath, &stats, &blocked, cache)
 
 		if completed && todo == len(books.Books) {
-			if err := state.Update(chunkKey, crawl.StatusUpdated, nil, ""); err != nil {
+			if err := state.Update(chunkKey, model.StatusUpdated, nil, ""); err != nil {
 				fail(err)
 			}
 		}
@@ -96,7 +99,7 @@ func main() {
 	}
 
 	if *resort && *limit == 0 {
-		all, err := crawl.ReadBooksDir(*outputDir)
+		all, err := store.ReadBooksDir(*outputDir)
 		if err != nil {
 			fail(err)
 		}
@@ -106,7 +109,7 @@ func main() {
 			}
 			return all.Books[i].ID < all.Books[j].ID
 		})
-		if err := crawl.WriteBooksDir(*outputDir, *all, crawl.DefaultChunkSize); err != nil {
+		if err := store.WriteBooksDir(*outputDir, *all, store.DefaultChunkSize); err != nil {
 			fail(err)
 		}
 		fmt.Println("resorted output by ratings descending")
@@ -115,13 +118,13 @@ func main() {
 
 // updateChunk refreshes the first todo books of a chunk in place, flushing
 // the chunk file periodically. Returns false when the run was hard-stopped.
-func updateChunk(client *crawl.Client, books *book.Books, todo, workers, flushEvery int,
+func updateChunk(client *fetch.Client, books *book.Books, todo, workers, flushEvery int,
 	chunkPath string, stats *struct{ updated, warned, failed, processed int }, blocked *bool,
 	cache map[string]book.Book) bool {
 
 	var mu sync.Mutex
 	flush := func() {
-		if err := crawl.WriteJSONFileAtomic(chunkPath, books); err != nil {
+		if err := store.WriteJSONFileAtomic(chunkPath, books); err != nil {
 			fmt.Println("warning: chunk flush failed:", err)
 		}
 	}
@@ -196,10 +199,10 @@ func updateChunk(client *crawl.Client, books *book.Books, todo, workers, flushEv
 	return !*blocked
 }
 
-func fetchAndRefresh(client *crawl.Client, old book.Book, blocked *bool, mu *sync.Mutex) (book.Book, string) {
+func fetchAndRefresh(client *fetch.Client, old book.Book, blocked *bool, mu *sync.Mutex) (book.Book, string) {
 	body, _, err := client.Fetch(old.URL)
 	if err != nil {
-		if errors.Is(err, crawl.ErrBlocked) {
+		if errors.Is(err, fetch.ErrBlocked) {
 			mu.Lock()
 			*blocked = true
 			mu.Unlock()
@@ -211,7 +214,7 @@ func fetchAndRefresh(client *crawl.Client, old book.Book, blocked *bool, mu *syn
 	if err != nil {
 		return old, "parse failed: " + err.Error()
 	}
-	return crawl.RefreshBook(old, parsed)
+	return identity.RefreshBook(old, parsed)
 }
 
 func fail(err error) {

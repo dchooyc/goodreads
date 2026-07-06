@@ -1,20 +1,39 @@
 # Goodreads Crawler
 
 Crawls Goodreads book pages breadth-first from a root book via each book's
-similar-books page. The dataset lives in the `output/` folder as small chunk
-files (~2000 books, ~1 MB each) so no single file ever upsets GitHub.
+similar-books page. The dataset lives in the `output/` folder, grouped by
+genre and chunked into small files (~2000 books, ~1 MB each) so no single
+file ever upsets GitHub.
 
 ## Dataset layout
 
 ```
 output/
-  books-00001.json   # {"books": [...]} — 2000 books, sorted by ratings desc
-  books-00002.json
-  ...
+  genres.json                     # every genre: name, book count, path
+  0-9/40k/books-00001.json        # genres bucketed by alphabetical range:
+  a-b/biography/books-00001.json  # 0-9 a-b c-d e-f g-h i-l m-n o-r s t-z
+  e-f/fantasy/books-00001.json    # chunked, sorted by ratings descending
+  e-f/fantasy/books-00002.json
+  t-z/uncategorized/...           # books that list no genres
 ```
 
-Every command accepts either a chunked folder or a single `.json` file for
-its inputs; writers write a folder unless the path ends in `.json`.
+A book appears under **every** genre it lists — genres are never dropped for
+being small, and never capped. Reads dedupe by work ID, so the logical
+dataset (163k unique books) is unchanged by the duplication. Every command
+accepts either an output folder or a single `.json` file for its inputs;
+writers write a folder unless the path ends in `.json`.
+
+## Package layout
+
+```
+cmd/               one folder per command (see below)
+internal/model     shared data contracts and statuses
+internal/fetch     polite HTTP client (timeouts, retries, backoff, hard stop)
+internal/store     JSON io, genre book store, checkpoint state
+internal/identity  title/author normalization, matching, refresh guard
+internal/dataset   compare / merge / QA logic
+internal/recovery  targeted recovery runner
+```
 
 ## Crawler
 

@@ -12,18 +12,21 @@ import (
 	"github.com/dchooyc/book"
 )
 
-// The output folder groups books by genre — every genre a book lists gets a
-// copy, no genre is dropped for being small, and no genre is capped:
+// The output folder groups books by genre, with genres bucketed into
+// alphabetical ranges so the folder stays browsable. Every genre a book
+// lists gets a copy, no genre is dropped for being small, and no genre is
+// capped:
 //
 //	output/
-//	  genres.json               // manifest of every genre with its book count
-//	  fantasy/books-00001.json  // chunked, sorted by ratings descending
-//	  fantasy/books-00002.json
-//	  uncategorized/...         // books that list no genres
+//	  genres.json                   // manifest: every genre, count and path
+//	  a-b/biography/books-00001.json
+//	  e-f/fantasy/books-00001.json  // chunked, sorted by ratings descending
+//	  e-f/fantasy/books-00002.json
+//	  t-z/uncategorized/...         // books that list no genres
 //
 // Reads dedupe by work ID, so the logical dataset is unchanged by the
-// duplication. Legacy flat layouts (books-*.json at the top level) still
-// load, and are cleaned up by the next write.
+// duplication. Legacy layouts (genre dirs or books-*.json at the top level)
+// still load, and are cleaned up by the next write.
 
 // DefaultChunkSize is how many books go into one chunk file (~1 MB), small
 // enough that GitHub never complains.
@@ -35,10 +38,33 @@ const GenresManifest = "genres.json"
 // UncategorizedGenre is where books without genres are filed.
 const UncategorizedGenre = "uncategorized"
 
+// genreBuckets are the alphabetical ranges genre folders are grouped into,
+// sized so each bucket holds a comparable number of genres.
+var genreBuckets = []string{"0-9", "a-b", "c-d", "e-f", "g-h", "i-l", "m-n", "o-r", "s", "t-z"}
+
+// bucketFor returns the alphabetical bucket a genre folder lives in.
+func bucketFor(genre string) string {
+	if genre == "" {
+		return genreBuckets[len(genreBuckets)-1]
+	}
+	c := genre[0]
+	if c >= '0' && c <= '9' {
+		return "0-9"
+	}
+	for _, b := range genreBuckets[1:] {
+		lo, hi := b[0], b[len(b)-1]
+		if c >= lo && c <= hi {
+			return b
+		}
+	}
+	return genreBuckets[len(genreBuckets)-1]
+}
+
 // GenreCount is one entry of genres.json.
 type GenreCount struct {
 	Name  string `json:"name"`
 	Books int    `json:"books"`
+	Path  string `json:"path"`
 }
 
 // GenresFile is the schema of genres.json.
@@ -100,19 +126,23 @@ func dedupeBooks(books []book.Book) []book.Book {
 }
 
 // ListBookChunks returns every chunk file of an output folder in order —
-// genre subfolders first, then any legacy top-level chunks.
+// bucketed genre folders first, then legacy genre folders, then legacy
+// top-level chunks.
 func ListBookChunks(dir string) ([]string, error) {
-	nested, err := filepath.Glob(filepath.Join(dir, "*", "books-*.json"))
-	if err != nil {
-		return nil, err
+	chunks := []string{}
+	for _, pattern := range []string{
+		filepath.Join(dir, "*", "*", "books-*.json"), // bucket/genre
+		filepath.Join(dir, "*", "books-*.json"),      // legacy genre
+		filepath.Join(dir, "books-*.json"),           // legacy flat
+	} {
+		found, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		sort.Strings(found)
+		chunks = append(chunks, found...)
 	}
-	flat, err := filepath.Glob(filepath.Join(dir, "books-*.json"))
-	if err != nil {
-		return nil, err
-	}
-	sort.Strings(nested)
-	sort.Strings(flat)
-	return append(nested, flat...), nil
+	return chunks, nil
 }
 
 // WriteBooksDir writes books into dir grouped by genre. Input duplicates are
@@ -152,7 +182,7 @@ func WriteBooksDir(dir string, books book.Books, chunkSize int) error {
 			return rows[i].ID < rows[j].ID
 		})
 
-		genreDir := filepath.Join(dir, g)
+		genreDir := filepath.Join(dir, bucketFor(g), g)
 		if err := os.MkdirAll(genreDir, 0o755); err != nil {
 			return fmt.Errorf("mkdir %s: %w", genreDir, err)
 		}
@@ -172,7 +202,11 @@ func WriteBooksDir(dir string, books book.Books, chunkSize int) error {
 			return err
 		}
 
-		manifest.Genres = append(manifest.Genres, GenreCount{Name: g, Books: len(rows)})
+		manifest.Genres = append(manifest.Genres, GenreCount{
+			Name:  g,
+			Books: len(rows),
+			Path:  filepath.ToSlash(filepath.Join(bucketFor(g), g)),
+		})
 	}
 
 	if err := removeStaleGenres(dir, byGenre); err != nil {
@@ -204,6 +238,36 @@ func removeStaleChunks(dir string, valid int) error {
 	return nil
 }
 
+func isBucketName(name string) bool {
+	for _, b := range genreBuckets {
+		if name == b {
+			return true
+		}
+	}
+	return false
+}
+
+// removeGenreDir deletes a genre folder's chunks and, if then empty, the
+// folder itself. Folders holding unrelated files are left in place.
+func removeGenreDir(genreDir string) error {
+	chunks, err := filepath.Glob(filepath.Join(genreDir, "books-*.json"))
+	if err != nil {
+		return err
+	}
+	if len(chunks) == 0 {
+		return nil // not a genre folder; leave it alone
+	}
+	for _, c := range chunks {
+		if err := os.Remove(c); err != nil {
+			return err
+		}
+	}
+	if err := os.Remove(genreDir); err != nil && !errors.Is(err, fs.ErrExist) {
+		return nil // directory had unrelated files; keep it
+	}
+	return nil
+}
+
 func removeStaleGenres(dir string, byGenre map[string][]book.Book) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -213,26 +277,33 @@ func removeStaleGenres(dir string, byGenre map[string][]book.Book) error {
 		if !e.IsDir() {
 			continue
 		}
-		if _, ok := byGenre[e.Name()]; ok {
+
+		if !isBucketName(e.Name()) {
+			// Legacy unbucketed genre folder from an earlier layout.
+			if err := removeGenreDir(filepath.Join(dir, e.Name())); err != nil {
+				return err
+			}
 			continue
 		}
-		genreDir := filepath.Join(dir, e.Name())
-		chunks, err := filepath.Glob(filepath.Join(genreDir, "books-*.json"))
+
+		bucketDir := filepath.Join(dir, e.Name())
+		genreDirs, err := os.ReadDir(bucketDir)
 		if err != nil {
 			return err
 		}
-		if len(chunks) == 0 {
-			continue // not a genre folder; leave it alone
-		}
-		for _, c := range chunks {
-			if err := os.Remove(c); err != nil {
+		for _, g := range genreDirs {
+			if !g.IsDir() {
+				continue
+			}
+			rows, ok := byGenre[g.Name()]
+			if ok && len(rows) > 0 && bucketFor(g.Name()) == e.Name() {
+				continue
+			}
+			if err := removeGenreDir(filepath.Join(bucketDir, g.Name())); err != nil {
 				return err
 			}
 		}
-		if err := os.Remove(genreDir); err != nil && !errors.Is(err, fs.ErrExist) {
-			// Directory had unrelated files; keep it.
-			continue
-		}
+		os.Remove(bucketDir) // removes the bucket only when empty
 	}
 	return nil
 }

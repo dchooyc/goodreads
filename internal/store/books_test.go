@@ -25,10 +25,10 @@ func TestWriteBooksDirGroupsByGenre(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"fantasy/books-00001.json",
-		"fiction/books-00001.json",
-		"obscure-genre/books-00001.json",
-		"uncategorized/books-00001.json",
+		"e-f/fantasy/books-00001.json",
+		"e-f/fiction/books-00001.json",
+		"o-r/obscure-genre/books-00001.json",
+		"t-z/uncategorized/books-00001.json",
 		GenresManifest,
 	} {
 		if _, err := os.Stat(filepath.Join(dir, want)); err != nil {
@@ -36,7 +36,7 @@ func TestWriteBooksDirGroupsByGenre(t *testing.T) {
 		}
 	}
 
-	fantasy, err := ReadBooksFile(filepath.Join(dir, "fantasy/books-00001.json"))
+	fantasy, err := ReadBooksFile(filepath.Join(dir, "e-f/fantasy/books-00001.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestWriteBooksDirCleansLegacyAndStale(t *testing.T) {
 	if err := WriteBooksDir(dir, one, 10); err != nil {
 		t.Fatal(err)
 	}
-	for _, gone := range []string{"fiction", "obscure-genre", "uncategorized"} {
+	for _, gone := range []string{"e-f/fiction", "o-r/obscure-genre", "t-z/uncategorized"} {
 		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
 			t.Errorf("stale genre dir %s should be removed", gone)
 		}
@@ -188,5 +188,64 @@ func TestWriteBooksDirEmpty(t *testing.T) {
 	out, err := ReadBooksDir(dir)
 	if err != nil || len(out.Books) != 0 {
 		t.Fatalf("empty dataset round trip failed: %v", err)
+	}
+}
+
+func TestBucketFor(t *testing.T) {
+	cases := []struct{ genre, want string }{
+		{"40k", "0-9"},
+		{"biography", "a-b"},
+		{"fantasy", "e-f"},
+		{"kids", "i-l"},
+		{"science-fiction", "s"},
+		{"uncategorized", "t-z"},
+		{"zombies", "t-z"},
+	}
+	for _, c := range cases {
+		if got := bucketFor(c.genre); got != c.want {
+			t.Errorf("bucketFor(%q) = %q, want %q", c.genre, got, c.want)
+		}
+	}
+}
+
+func TestManifestIncludesPaths(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteBooksDir(dir, genreBooks(), 10); err != nil {
+		t.Fatal(err)
+	}
+	var manifest GenresFile
+	if err := ReadJSONFile(filepath.Join(dir, GenresManifest), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range manifest.Genres {
+		if g.Name == "fantasy" && g.Path != "e-f/fantasy" {
+			t.Errorf("fantasy path = %q, want e-f/fantasy", g.Path)
+		}
+	}
+}
+
+func TestWriteBooksDirMigratesLegacyGenreLayout(t *testing.T) {
+	dir := t.TempDir()
+	// Old unbucketed layout: genre folder at the top level.
+	if err := os.MkdirAll(filepath.Join(dir, "fantasy"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSONFileAtomic(filepath.Join(dir, "fantasy", "books-00001.json"), genreBooks()); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := ReadBooksDir(dir)
+	if err != nil || len(loaded.Books) != 4 {
+		t.Fatalf("legacy genre layout should load: %v", err)
+	}
+
+	if err := WriteBooksDir(dir, *loaded, 10); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "fantasy")); !os.IsNotExist(err) {
+		t.Error("legacy genre dir should be cleaned up")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "e-f", "fantasy", "books-00001.json")); err != nil {
+		t.Errorf("bucketed layout missing: %v", err)
 	}
 }

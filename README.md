@@ -1,123 +1,86 @@
 # Goodreads Crawler
 
 Crawls Goodreads book pages breadth-first from a root book via each book's
-similar-books page, and writes `output.json` (books sorted by ratings
-descending). Includes a targeted recovery pipeline for backfilling books that
-an earlier crawl knew about but a newer crawl dropped.
+similar-books page. The dataset lives in the `output/` folder as small chunk
+files (~2000 books, ~1 MB each) so no single file ever upsets GitHub.
+
+## Dataset layout
+
+```
+output/
+  books-00001.json   # {"books": [...]} — 2000 books, sorted by ratings desc
+  books-00002.json
+  ...
+```
+
+Every command accepts either a chunked folder or a single `.json` file for
+its inputs; writers write a folder unless the path ends in `.json`.
 
 ## Crawler
 
-    go run . -url <goodreads_book_url> -depth <depth> -workers <workers> -output <json_file>
+    go run . -url <goodreads_book_url> -depth <depth> -workers <workers> -output output
 
-Extra politeness flags: `-delay` (min delay between requests, default 2s),
-`-timeout` (default 30s), `-max-retries` (default 3), `-user-agent`.
+Politeness flags: `-delay` (default 2s), `-timeout` (30s), `-max-retries`
+(3), `-user-agent`. Progress is checkpointed: the crawler atomically rewrites
+the output folder every `-flush-every` saved books (default 100) and after
+each depth, so an interrupted crawl keeps everything collected so far. Point
+`-input output` at an existing folder to seed the queue from it.
 
-All HTTP goes through a shared polite client: per-request timeout,
-identifying User-Agent, minimum delay with jitter, bounded retries with
-exponential backoff, `Retry-After` support, and a hard stop after 3
-consecutive 403/429 responses. A book whose detail page fetch succeeds is
-saved even if its similar-books expansion fails.
+All HTTP goes through one shared polite client: per-request timeout,
+identifying User-Agent, minimum delay with jitter, linear retry backoff
+(10s/20s/30s), `Retry-After` support, and a hard stop after 3 consecutive
+403/429 responses. A book whose detail page fetch succeeds is saved even if
+its similar-books expansion fails.
 
-To build a binary: `go build` then `./goodreads <flags>`.
+## Updating all titles
 
-## Recovery runbook (missing books backfill)
+    go run ./cmd/update-titles                 # full refresh of output/
+    go run ./cmd/update-titles -limit 20       # sample run
+    make update-titles
 
-The recovery pipeline verifies and backfills works that were present in a
-previous canonical output but absent (by Goodreads work ID) from a new one.
+Re-fetches every book and refreshes rating/ratings/reviews/cover/authors/
+genres in place, chunk by chunk. Defaults: 50 workers, 100ms delay
+(~10 req/s — reasonably fast without being abusive), flush every 200 books,
+per-chunk resume state in `update-state.json`. Interrupt any time; rerunning
+skips completed chunks (`-force` redoes them). A page whose work ID differs
+from the stored one, or that parses without ratings, never overwrites the
+stored row. After a full run the folder is resorted by ratings descending
+(`-resort=false` to skip). Full refresh of ~163k books takes ~4.5–5 h.
 
-**Note for the current recovery effort:** the repo's `output.json` is the NEW
-crawl (157,636 raw rows). The old snapshot data lives inside
-`topreads-missing-books-to-double-check.json` (14,247 targets), which was
-already generated. Start at step 2.
+## Recovery pipeline (backfilling dropped books)
+
+Verifies and backfills works present in a previous output but absent (by
+Goodreads work ID) from a new one.
 
 ```bash
-# 1. Compare old and new outputs (only if you have both files)
-make compare-missing OLD=output.json NEW=output\(1\).json
-# writes topreads-missing-books-to-double-check.json + blank_id_candidates.json
+# 1. Compare old and new outputs -> prioritized target list (P0..P3)
+go run ./cmd/compare-missing -old <old> -new <new> -out topreads-missing-books-to-double-check.json
 
-# 2. Recover the highest-impact missing books first, small batch to validate
-make recover-missing PRIORITY=P0 LIMIT=100
-cat recovery-report.md        # inspect before continuing
+# 2. Recover, most important first (resumable; state in recovery-state.json)
+go run ./cmd/recover-missing -priority P0 -limit 100
+go run ./cmd/recover-missing -priority all
 
-# 3. Continue recovery by priority (each tier only after the previous looks clean)
-make recover-missing PRIORITY=P0
-make recover-missing PRIORITY=P1
-make recover-missing PRIORITY=P2
-make recover-missing PRIORITY=P3
+# 3. Merge recovered books into the output folder
+go run ./cmd/merge-outputs -new output -recovered recovered-missing-books.json -out output
 
-# 4. Merge new output + recovered books
-make merge-outputs NEW=output.json RECOVERED=recovered-missing-books.json
-# writes output.merged.json + merge-report.json
-
-# 5. Run QA gates against the previous accepted output
-make crawl-qa OLD=output.json
-# writes crawl-quality-report.{json,md}; exits nonzero on regression
+# 4. QA gates (nonzero exit on regression)
+go run ./cmd/crawl-qa -old <previous-accepted> -new output -recovered recovered-missing-books.json
 ```
 
-Or use the wrapper script: `./scripts/recover-missing.sh P0 100`.
+Identity rules: a matching work ID is high confidence; a blank parsed ID with
+matching title+author fills the expected ID (with a warning); a *different*
+work ID is never silently accepted (`needs_manual_review`).
+`-keep-previous-on-fail` keeps the previous snapshot row when a page cannot
+be fetched. Recovery is checkpointed after every target and resumes where it
+stopped; on repeated 403/429 it exits with code 2 — wait, then rerun.
 
-### Politeness settings and expected runtime
+QA gates: missing P0 works without a recovery decision, blank-ID rate rising
+more than 0.25 pp, canonical count dropping more than 1%, or more than 10 of
+the previous top-1000 disappearing.
 
-Recovery runs sequentially with a 3s minimum delay (plus jitter), 30s
-timeout, and 3 retries with 10s→5m exponential backoff. Rough runtimes at
-~3.5s/request (more if alias URLs get attempted):
+## Utilities
 
-| Tier | Targets | Approx. time |
-|---|---|---|
-| P0 | 129 | ~10 min |
-| P1 | 467 | ~30 min |
-| P2 | 1,990 | ~2.5 h |
-| P3 | 11,661 | ~12 h |
-
-### Resume behavior
-
-`recovery-state.json` is checkpointed atomically after **every** target.
-Interrupt the run at any time; rerunning the same command skips targets that
-already reached a terminal status (`recovered`, `kept_from_previous_snapshot`,
-`below_threshold`, `needs_manual_review`, `parse_failed`). Transient failures
-(`http_failed`, `blocked`) are retried on the next run. Use `-force` to
-re-process everything.
-
-### Output files
-
-| File | Contents |
-|---|---|
-| `topreads-missing-books-to-double-check.json` | prioritized recovery targets (P0–P3) with old snapshot data |
-| `blank_id_candidates.json` | new-output rows with blank IDs matching missing old works |
-| `recovered-missing-books.json` | recovered books + full per-target audit results |
-| `recovery-report.md` | human-readable recovery summary grouped by status |
-| `recovery-state.json` | per-target checkpoint state (resume file) |
-| `output.merged.json` | new output + recovered books, no duplicate/blank IDs |
-| `merge-report.json` | merge provenance: kept/replaced/added IDs, aliases, quarantined blank-ID rows |
-| `crawl-quality-report.{json,md}` | QA metrics and gate results |
-
-### Identity rules
-
-- Parsed work ID equals expected ID → recovered (high confidence).
-- Parsed ID blank but normalized title + author match → recovered with the
-  expected ID filled from the previous snapshot, plus a warning.
-- Parsed ID *different* but title/author match → `needs_manual_review`; a
-  different work ID is never silently accepted.
-- With `-keep-previous-on-fail` (the Makefile default), unfetchable pages
-  keep the previous snapshot row so the dataset does not lose the book, and
-  the fallback is recorded in the reports.
-
-### If Goodreads returns 403/429
-
-The client honours `Retry-After`, backs off exponentially, and hard-stops the
-whole run after 3 consecutive 403/429 responses (exit code 2). Everything is
-checkpointed, so wait — an hour is a good default — then rerun the same
-command; it resumes where it stopped. Do not increase workers or shrink the
-delay to push through blocks.
-
-### QA gates (nonzero exit)
-
-- Any P0 work missing without an explicit recovery decision.
-- Blank-ID rate more than 0.25 percentage points above the previous output.
-- Canonical ID count dropping more than 1% vs the previous accepted output.
-- More than 10 of the previous top-1,000 books disappearing.
-
-Keep the old output file until `output.merged.json` passes QA.
+    go run ./cmd/split-output -in big.json -out output   # split a monolithic file into chunks
 
 ## Tests
 

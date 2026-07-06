@@ -1,13 +1,14 @@
-OLD ?= output.json
-NEW ?= output.json
+OLD ?= output
+NEW ?= output
+OUTPUT ?= output
 RECOVERED ?= recovered-missing-books.json
 TARGETS ?= topreads-missing-books-to-double-check.json
 PRIORITY ?= P0
 LIMIT ?= 0
-DELAY ?= 3s
-WORKERS ?= 1
+DELAY ?= 100ms
+WORKERS ?= 50
 
-.PHONY: test compare-missing recover-missing merge-outputs crawl-qa
+.PHONY: test compare-missing recover-missing merge-outputs crawl-qa update-titles split-output
 
 test:
 	go test ./...
@@ -20,7 +21,13 @@ recover-missing:
 		-workers $(WORKERS) -delay $(DELAY) -out '$(RECOVERED)' -keep-previous-on-fail
 
 merge-outputs:
-	go run ./cmd/merge-outputs -new '$(NEW)' -recovered '$(RECOVERED)' -out output.merged.json
+	go run ./cmd/merge-outputs -new '$(NEW)' -recovered '$(RECOVERED)' -out '$(OUTPUT)'
 
 crawl-qa:
-	go run ./cmd/crawl-qa -old '$(OLD)' -new output.merged.json -recovered '$(RECOVERED)'
+	go run ./cmd/crawl-qa -old '$(OLD)' -new '$(OUTPUT)' -recovered '$(RECOVERED)'
+
+update-titles:
+	go run ./cmd/update-titles -output '$(OUTPUT)' -workers $(WORKERS) -delay $(DELAY) -limit $(LIMIT)
+
+split-output:
+	go run ./cmd/split-output -in '$(NEW)' -out '$(OUTPUT)'
